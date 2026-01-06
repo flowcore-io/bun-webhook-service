@@ -13,6 +13,6 @@ if (!process.env.POSTGRES_CONNECTION_STRING) {
 		"postgresql://postgres:test@localhost:54321/bun_webhook_service_test"
 }
 if (!process.env.SERVICE_PORT) process.env.SERVICE_PORT = "3000"
-if (!process.env.REDIS_SENTINEL_HOSTS) process.env.REDIS_SENTINEL_HOSTS = "localhost:26379"
+if (!process.env.REDIS_SENTINEL_HOSTS) process.env.REDIS_SENTINEL_HOSTS = "localhost:126379"
 if (!process.env.REDIS_SENTINEL_MASTER_NAME) process.env.REDIS_SENTINEL_MASTER_NAME = "mymaster"
-if (!process.env.NATS_URL) process.env.NATS_URL = "nats://localhost:4222"
+if (!process.env.NATS_URL) process.env.NATS_URL = "nats://localhost:14222"

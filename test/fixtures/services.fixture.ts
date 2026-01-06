@@ -4,6 +4,8 @@ import { sql } from "drizzle-orm"
 
 export const servicesUp = async () => {
   process.stdout.write("➖ Starting services: ")
+  // Stop any existing containers first to avoid port conflicts
+  await $`docker compose down -v --remove-orphans`.cwd("./test").quiet()
   // Start services without --wait to avoid Docker Compose issues
   const exitCode = await (await $`docker compose up -d`.cwd("./test").quiet()).exitCode
   if (exitCode !== 0) {
@@ -50,7 +52,7 @@ export const servicesDown = async () => {
 
 export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
-  const start = performance.now()
+  const _start = performance.now()
   
   // Wait for PostgreSQL to be ready
   let retries = 30

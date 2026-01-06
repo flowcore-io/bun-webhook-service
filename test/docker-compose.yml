@@ -3,7 +3,7 @@ services:
     image: redis/redis-stack-server:latest
     container_name: test-redis
     ports:
-      - "6379:6379"
+      - "16379:6379" # Redis port mapped to 16379 to avoid conflicts
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -26,8 +26,8 @@ services:
   test-nats:
     image: nats:latest
     ports:
-      - "4222:4222" # NATS client port
-      - "8222:8222" # Monitoring port
+      - "14222:4222" # NATS client port (mapped to 14222 to avoid conflicts)
+      - "18222:8222" # Monitoring port (mapped to 18222 to avoid conflicts)
     command: ["-m", "8222"] # Monitoring port, no JetStream
     # Check if NATS process is running (simple and reliable)
     healthcheck:
@@ -48,7 +48,7 @@ services:
         redis-sentinel /tmp/sentinel.conf
       "
     ports:
-      - "26379:26379"
+      - "126379:26379" # Redis Sentinel port mapped to 126379 to avoid conflicts
     volumes:
       - ./redis-sentinel.conf:/etc/redis/sentinel.conf:ro
     depends_on:
