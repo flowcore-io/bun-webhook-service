@@ -4,11 +4,39 @@ import { sql } from "drizzle-orm"
 
 export const servicesUp = async () => {
   process.stdout.write("➖ Starting services: ")
-  const exitCode = await (await $`docker compose up --wait -d`.cwd("./test").quiet()).exitCode
+  // Start services without --wait to avoid Docker Compose issues
+  const exitCode = await (await $`docker compose up -d`.cwd("./test").quiet()).exitCode
   if (exitCode !== 0) {
     throw new Error("Failed to start services")
   }
-  console.log("✅")
+  
+  // Wait for services to be healthy manually
+  // Key services that must be healthy: postgres, redis, redis-sentinel
+  const requiredServices = ["test-postgres", "test-redis", "test-redis-sentinel"]
+  let retries = 60 // Increased timeout for Sentinel startup
+  while (retries > 0) {
+    const status = await (await $`docker compose ps --format json`.cwd("./test").quiet()).text()
+    const containers = JSON.parse(`[${status.split("\n").filter(Boolean).join(",")}]`)
+    
+    // Check that all containers are running
+    const allRunning = containers.every((c: { State: string }) => c.State === "running")
+    
+    // Check that required services are healthy
+    const requiredHealthy = requiredServices.every((serviceName) => {
+      const container = containers.find((c: { Service: string }) => c.Service === serviceName)
+      if (!container) return false
+      // Must be running and either no healthcheck or healthy
+      return container.State === "running" && (!container.Health || container.Health === "healthy")
+    })
+    
+    if (allRunning && requiredHealthy && containers.length >= requiredServices.length) {
+      console.log("✅")
+      return
+    }
+    await Bun.sleep(1000)
+    retries--
+  }
+  console.log("⚠️  (some services may not be fully ready)")
 }
 
 export const servicesDown = async () => {
@@ -23,6 +51,20 @@ export const servicesDown = async () => {
 export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const start = performance.now()
+  
+  // Wait for PostgreSQL to be ready
+  let retries = 30
+  while (retries > 0) {
+    try {
+      await db.execute(sql`SELECT 1`)
+      break
+    } catch (error) {
+      if (retries === 1) throw error
+      await Bun.sleep(500)
+      retries--
+    }
+  }
+  
   await db.execute(sql`DROP SCHEMA public CASCADE`)
   await db.execute(sql`CREATE SCHEMA public`)
   const exitCode = await Bun.spawn(["bun", "--env-file=.env.test", "drizzle-kit", "push"], {

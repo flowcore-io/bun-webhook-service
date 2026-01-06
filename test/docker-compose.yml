@@ -1,8 +1,19 @@
 services:
+  test-redis:
+    image: redis/redis-stack-server:latest
+    container_name: test-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   test-postgres:
     image: postgres:16.8-alpine
     ports:
-      - "54321:5432"  # Different port to avoid conflicts
+      - "54321:5432" # Different port to avoid conflicts
     environment:
       POSTGRES_PASSWORD: test
       POSTGRES_DB: bun_webhook_service_test
@@ -12,14 +23,43 @@ services:
       timeout: 5s
       retries: 10
 
-  test-localstack:
-    container_name: "${LOCALSTACK_DOCKER_NAME-localstack_main}"
-    image: localstack/localstack:2.0.1
+  test-nats:
+    image: nats:latest
     ports:
-      - "127.0.0.1:4566:4566"  # LocalStack Gateway
-      - "127.0.0.1:4510-4559:4510-4559"  # External services port range
-    environment:
-      - DEBUG=${DEBUG-}
-      - DOCKER_HOST=unix:///var/run/docker.sock
+      - "4222:4222" # NATS client port
+      - "8222:8222" # Monitoring port
+    command: ["-m", "8222"] # Monitoring port, no JetStream
+    # Check if NATS process is running (simple and reliable)
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'nats-server' > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  test-redis-sentinel:
+    image: redis:latest
+    container_name: test-redis-sentinel
+    command: >
+      sh -c "
+        sleep 5 &&
+        REDIS_IP=$$(getent hosts test-redis | awk '{print $$1}' | head -1) &&
+        sed \"s/test-redis/$$REDIS_IP/g\" /etc/redis/sentinel.conf > /tmp/sentinel.conf &&
+        redis-sentinel /tmp/sentinel.conf
+      "
+    ports:
+      - "26379:26379"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"
+      - ./redis-sentinel.conf:/etc/redis/sentinel.conf:ro
+    depends_on:
+      test-redis:
+        condition: service_healthy
+    environment:
+      - SKIP_FIX_PERMS=1
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: on-failure

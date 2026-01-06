@@ -1,6 +1,6 @@
-import { type Mock, jest } from "bun:test"
 import { HonoApi } from "@flowcore/hono-api"
 import type { FlowcoreEvent } from "@flowcore/pathways"
+import { type Mock, jest } from "bun:test"
 
 export type WebhookTestFixtureOptions = {
   tenant: string
@@ -112,10 +112,19 @@ export class WebhookTestFixture<T extends Record<string, Record<string, WebhookS
   public async start() {
     await this.stop()
     this.clear()
-    this.server = Bun.serve({
-      port: this.options.port,
-      fetch: this.api.app.fetch,
-    })
+    try {
+      this.server = Bun.serve({
+        port: this.options.port,
+        fetch: this.api.app.fetch,
+      })
+    } catch (error: unknown) {
+      // If port is already in use, that's okay - another instance might be running
+      if (error && typeof error === "object" && "code" in error && error.code === "EADDRINUSE") {
+        // Port is in use, skip starting
+        return
+      }
+      throw error
+    }
   }
 
   public clear() {

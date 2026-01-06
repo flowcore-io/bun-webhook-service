@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  postgres-dev:
+    image: postgres:16.8-alpine
+    container_name: bun-webhook-service-postgres-dev
+    ports:
+      - "5432:5432" # Standard PostgreSQL port for dev
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-bun_webhook_service_dev}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nats-dev:
+    image: nats:latest
+    container_name: bun-webhook-service-nats-dev
+    ports:
+      - "4222:4222" # NATS client port
+      - "8222:8222" # Monitoring port
+    command: ["-m", "8222"] # Monitoring port, no JetStream
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep nats-server || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis-dev:
+    image: redis/redis-stack-server:latest
+    container_name: bun-webhook-service-redis-dev
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis-sentinel-dev:
+    image: redis:latest
+    container_name: bun-webhook-service-redis-sentinel-dev
+    command: >
+      sh -c "
+        sleep 5 &&
+        REDIS_IP=$$(getent hosts redis-dev | awk '{print $$1}' | head -1) &&
+        sed \"s/redis-dev/$$REDIS_IP/g\" /etc/redis/sentinel.conf > /tmp/sentinel.conf &&
+        redis-sentinel /tmp/sentinel.conf
+      "
+    ports:
+      - "26379:26379"
+    volumes:
+      - ./redis-sentinel.conf:/etc/redis/sentinel.conf:ro
+    depends_on:
+      redis-dev:
+        condition: service_healthy
+    environment:
+      - SKIP_FIX_PERMS=1
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "26379", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: on-failure
+
+volumes:
+  postgres-dev-data:

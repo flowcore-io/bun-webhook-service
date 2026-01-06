@@ -1,4 +1,2 @@
-// Database tables will be defined here
-// For now, this is a placeholder
-
-export {}
+// Export all database tables
+export * from "./flowcore"

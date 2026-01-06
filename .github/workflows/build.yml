@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   extract_info:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
       - name: Extract version from package.json
@@ -35,7 +35,7 @@ jobs:
 
   build_docker:
     needs: extract_info
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
         with:
@@ -59,20 +59,23 @@ jobs:
           aws ecr describe-repositories --repository-names $ECR_REPOSITORY --region eu-west-1 || \
           aws ecr create-repository --repository-name $ECR_REPOSITORY --region eu-west-1
 
+      - name: Setup Docker Builder
+        uses: useblacksmith/setup-docker-builder@v1
+
       - name: Build and push Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ needs.extract_info.outputs.package }}
-          IMAGE_TAG: ${{ needs.extract_info.outputs.version }}
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        uses: useblacksmith/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ needs.extract_info.outputs.package }}:${{ needs.extract_info.outputs.version }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ needs.extract_info.outputs.package }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     needs: [build_docker, extract_info]
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - name: Checkout deployment repo
         uses: actions/checkout@v4

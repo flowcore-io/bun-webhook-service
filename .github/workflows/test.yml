@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,5 +37,11 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      - name: Start Services
+        run: bun run services:up
+
       - name: Test
         run: bun run test
+
+      - name: Stop Services
+        run: bun run services:down

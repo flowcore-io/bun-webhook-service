@@ -1,5 +1,6 @@
 import { Environment, LogLevel, NodeEnv, zBooleanString } from "@flowcore/hono-api"
 import { z } from "zod"
+import { TOPIC_GUARANTEED_INGESTION_CHANNEL } from "@/constants/ingestion.constants"
 
 const environment = new Environment(
   z.object({
@@ -35,6 +36,17 @@ const environment = new Environment(
     // Database
     POSTGRES_CONNECTION_STRING: z.string(),
     POSTGRES_LOG_QUERY: zBooleanString.default(false),
+
+    // Redis Sentinel
+    REDIS_SENTINEL_HOSTS: z.string().optional(),
+    REDIS_SENTINEL_MASTER_NAME: z.string().optional().default("mymaster"),
+    REDIS_PASSWORD: z.string().optional(),
+    REDIS_CACHE_TTL: z.coerce.number().optional().default(300),
+    BUN_PROMISE_CACHE_TTL: z.coerce.number().optional().default(30),
+
+        // NATS
+        NATS_URL: z.string().optional().default("nats://localhost:4222"),
+        NATS_TOPIC: z.string().optional().default(TOPIC_GUARANTEED_INGESTION_CHANNEL),
   }),
 )
 
