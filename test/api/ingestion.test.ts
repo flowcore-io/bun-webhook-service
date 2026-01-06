@@ -31,7 +31,7 @@ const redisFixture = new RedisFixture()
 
 // Test configuration - use environment variables directly
 const NATS_URL = process.env.NATS_URL || "nats://localhost:14222"
-const REDIS_SENTINEL_HOSTS = process.env.REDIS_SENTINEL_HOSTS || "localhost:126379"
+const REDIS_SENTINEL_HOSTS = process.env.REDIS_SENTINEL_HOSTS || "localhost:26380"
 const REDIS_MASTER_NAME = process.env.REDIS_SENTINEL_MASTER_NAME || "mymaster"
 
 // Detect CI environment

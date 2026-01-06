@@ -48,7 +48,7 @@ services:
         redis-sentinel /tmp/sentinel.conf
       "
     ports:
-      - "126379:26379" # Redis Sentinel port mapped to 126379 to avoid conflicts
+      - "26380:26379" # Redis Sentinel port mapped to 26380 to avoid conflicts
     volumes:
       - ./redis-sentinel.conf:/etc/redis/sentinel.conf:ro
     depends_on:
