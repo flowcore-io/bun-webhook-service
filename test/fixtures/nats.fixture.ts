@@ -49,7 +49,7 @@ export class NatsFixture {
 						data,
 						headers: msg.headers,
 					})
-				} catch (error) {
+				} catch (_error) {
 					// If JSON parsing fails, store raw data
 					messages.push({
 						topic: msg.subject,

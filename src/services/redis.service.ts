@@ -64,7 +64,7 @@ class RedisService {
 			// Try to connect if not connected
 			try {
 				await this.connect()
-			} catch (error) {
+			} catch (_error) {
 				// If connection fails, throw error
 				throw new Error("Redis client not connected and connection attempt failed.")
 			}
