@@ -1,0 +1,108 @@
+name: Build and Deploy to Production
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  extract_info:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version from package.json
+        uses: sergeysova/jq-action@v2
+        id: version
+        with:
+          cmd: "jq .version package.json -r"
+      - name: Extract package name from package.json
+        uses: sergeysova/jq-action@v2
+        id: package
+        with:
+          cmd: "jq .name package.json -r"
+      - name: Extract deployment metadata from flowcore.deployment.json
+        uses: sergeysova/jq-action@v2
+        id: deployment
+        with:
+          cmd: "jq . flowcore.deployment.json -c"
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      package: ${{ steps.package.outputs.value }}
+      deployment: ${{ steps.deployment.outputs.value }}
+
+  build_docker:
+    needs: extract_info
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.FLOWCORE_MACHINE_GITHUB_TOKEN }}
+          submodules: true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::305363105399:role/ECRGithubManager
+          aws-region: eu-west-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR repository if it doesn't exist
+        env:
+          ECR_REPOSITORY: ${{ needs.extract_info.outputs.package }}
+        run: |
+          aws ecr describe-repositories --repository-names $ECR_REPOSITORY --region eu-west-1 || \
+          aws ecr create-repository --repository-name $ECR_REPOSITORY --region eu-west-1
+
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ needs.extract_info.outputs.package }}
+          IMAGE_TAG: ${{ needs.extract_info.outputs.version }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  deploy:
+    needs: [build_docker, extract_info]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout deployment repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ fromJson(needs.extract_info.outputs.deployment).repository }}
+          token: ${{ secrets.FLOWCORE_MACHINE_GITHUB_TOKEN }}
+          path: deployment-repo
+
+      - name: Setup yq
+        uses: mikefarah/yq@v4.42.1
+
+      - name: Update image tag
+        working-directory: deployment-repo
+        env:
+          TAG_PATH: ${{ fromJson(needs.extract_info.outputs.deployment).deploymentPath }}
+          VERSION: ${{ needs.extract_info.outputs.version }}
+        run: |
+          echo "Updating tag path: $TAG_PATH"
+          echo "New tag: $VERSION"
+          yq eval ".$TAG_PATH = \"$VERSION\"" -i configuration/azure-eu.yaml
+
+      - name: Commit and push
+        working-directory: deployment-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: update ${{ needs.extract_info.outputs.package }} to ${{ needs.extract_info.outputs.version }}"
+          git push

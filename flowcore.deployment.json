@@ -1,0 +1,4 @@
+{
+  "deploymentPath": "flowcore-microservices.deployments.bunWebhookService.deployment.tag",
+  "repository": "flowcore-io/platform-public-manifests"
+}
