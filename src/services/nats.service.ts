@@ -28,7 +28,7 @@ class NatsService {
 			// Try to connect if not connected
 			try {
 				await this.connect()
-			} catch (error) {
+			} catch (_error) {
 				// If connection fails, throw error
 				throw new Error("NATS connection not established and connection attempt failed.")
 			}

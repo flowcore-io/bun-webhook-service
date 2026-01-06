@@ -1,4 +1,4 @@
-import { LogLevel, loggerFactory } from "@flowcore/hono-api"
+import { loggerFactory } from "@flowcore/hono-api"
 import env from "@/env"
 
 const factory = loggerFactory({

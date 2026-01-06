@@ -1,5 +1,4 @@
 import { AuthType, HonoApiRouter, AppExceptionNotFound, AppExceptionBadRequest } from "@flowcore/hono-api"
-import type { PathwaysBuilder } from "@flowcore/pathways"
 import { TimeUuid } from "@flowcore/time-uuid"
 import { z } from "zod"
 import { validationService } from "@/services/validation.service"
@@ -11,8 +10,9 @@ import {
 	HEADER_EVENT_TIME_KEY,
 	HEADER_VALID_TIME_KEY,
 } from "@/constants/ingestion.constants"
+import type { pathways } from "@/pathways/pathways"
 
-export const ingestionRouter = new HonoApiRouter<PathwaysBuilder<any, any> | undefined>()
+export const ingestionRouter = new HonoApiRouter<typeof pathways | undefined>()
 
 // Single event ingestion route
 ingestionRouter.post("/event/:tenant/:dataCore/:flowType/:eventType", {
@@ -78,7 +78,7 @@ ingestionRouter.post("/event/:tenant/:dataCore/:flowType/:eventType", {
 			try {
 				const decoded = Buffer.from(headers[HEADER_METADATA_JSON], "base64").toString("utf-8")
 				metadata = JSON.parse(decoded) as Record<string, unknown>
-			} catch (error) {
+			} catch (_error) {
 				throw new AppExceptionBadRequest(undefined, undefined, "Invalid metadata header: must be valid base64-encoded JSON")
 			}
 		}
@@ -172,7 +172,7 @@ ingestionRouter.post("/events/:tenant/:dataCore/:flowType/:eventType", {
 			try {
 				const decoded = Buffer.from(headers[HEADER_METADATA_JSON], "base64").toString("utf-8")
 				metadata = JSON.parse(decoded) as Record<string, unknown>
-			} catch (error) {
+			} catch (_error) {
 				throw new AppExceptionBadRequest(undefined, undefined, "Invalid metadata header: must be valid base64-encoded JSON")
 			}
 		}
