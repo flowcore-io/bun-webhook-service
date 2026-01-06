@@ -1,0 +1,14 @@
+# Production preload - initializes OpenTelemetry (if needed)
+# preload = ["./src/otel.ts"]
+
+# Test configuration
+[test]
+# Test files root directory
+root = "./test"
+
+# Preload files executed before each test
+# Order matters: mocks must load before setup
+preload = [
+  "./test/mocks/flowcore-sdk.ts",    # Mock Flowcore SDK
+  "./test/setup.ts"                   # Test lifecycle setup
+]

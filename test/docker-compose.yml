@@ -1,0 +1,25 @@
+services:
+  test-postgres:
+    image: postgres:16.8-alpine
+    ports:
+      - "54321:5432"  # Different port to avoid conflicts
+    environment:
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: bun_webhook_service_test
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  test-localstack:
+    container_name: "${LOCALSTACK_DOCKER_NAME-localstack_main}"
+    image: localstack/localstack:2.0.1
+    ports:
+      - "127.0.0.1:4566:4566"  # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # External services port range
+    environment:
+      - DEBUG=${DEBUG-}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
