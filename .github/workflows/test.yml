@@ -37,9 +37,6 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
-      - name: Start Services
-        run: bun run services:up
-
       - name: Test
         run: bun run test
 
