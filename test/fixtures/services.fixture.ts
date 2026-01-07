@@ -3,11 +3,18 @@ import { $ } from "bun"
 import { sql } from "drizzle-orm"
 
 export const servicesUp = async () => {
-  process.stdout.write("➖ Starting services: ")
+  console.log("➖ Starting services...")
   // In CI: clean environment, just start services normally
   // Local dev: user controls services manually
-  const exitCode = await (await $`docker compose up -d`.cwd("./test").quiet()).exitCode
-  if (exitCode !== 0) {
+  const result = await $`docker compose up -d`.cwd("./test")
+  // Output docker compose logs
+  if (result.stdout) {
+    console.log(result.stdout.toString())
+  }
+  if (result.exitCode !== 0) {
+    if (result.stderr) {
+      console.error(result.stderr.toString())
+    }
     throw new Error("Failed to start services")
   }
   
@@ -16,7 +23,8 @@ export const servicesUp = async () => {
   const requiredServices = ["test-postgres", "test-redis", "test-redis-sentinel"]
   let retries = 60 // Increased timeout for Sentinel startup
   while (retries > 0) {
-    const status = await (await $`docker compose ps --format json`.cwd("./test").quiet()).text()
+    const statusResult = await $`docker compose ps --format json`.cwd("./test").quiet()
+    const status = await statusResult.text()
     const containers = JSON.parse(`[${status.split("\n").filter(Boolean).join(",")}]`)
     
     // Check that all containers are running
@@ -41,9 +49,16 @@ export const servicesUp = async () => {
 }
 
 export const servicesDown = async () => {
-  process.stdout.write("➖ Stopping services: ")
-  const exitCode = await (await $`docker compose down -v --remove-orphans`.cwd("./test").quiet()).exitCode
-  if (exitCode !== 0) {
+  console.log("➖ Stopping services...")
+  const result = await $`docker compose down -v --remove-orphans`.cwd("./test")
+  // Output docker compose logs
+  if (result.stdout) {
+    console.log(result.stdout.toString())
+  }
+  if (result.exitCode !== 0) {
+    if (result.stderr) {
+      console.error(result.stderr.toString())
+    }
     throw new Error("Failed to stop services")
   }
   console.log("✅")
