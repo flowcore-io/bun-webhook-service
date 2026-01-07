@@ -1,4 +1,3 @@
-import { db } from "@/database"
 import { $ } from "bun"
 import { sql } from "drizzle-orm"
 
@@ -47,6 +46,9 @@ export const servicesDown = async () => {
 export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
+  
+  // Dynamically import database to ensure environment variables are set
+  const { db } = await import("@/database")
   
   // Wait for database to be ready
   let retries = 30
