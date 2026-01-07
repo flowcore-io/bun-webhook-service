@@ -60,8 +60,8 @@ beforeAll(
     // In CI, start Docker services and migrate database
     if (isCI) {
       await servicesUp();
-      await servicesResetAndMigrate();
     }
+    await servicesResetAndMigrate();
   },
   120000 // 120 second timeout for setup (services can take up to 60s to start)
 );
