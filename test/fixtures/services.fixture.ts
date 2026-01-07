@@ -82,7 +82,9 @@ export const servicesResetAndMigrate = async () => {
   
   // Print connection string for debugging
   const connectionString = process.env.POSTGRES_CONNECTION_STRING || "not set"
-  console.log(`📋 PostgreSQL connection string (raw, length ${connectionString.length}): ${connectionString.substring(0, 50)}...`)
+  // Show first 60 chars to see the actual format (without masking)
+  const preview = connectionString.length > 60 ? connectionString.substring(0, 60) + "..." : connectionString
+  console.log(`📋 PostgreSQL connection string (raw, length ${connectionString.length}): ${preview}`)
   // Parse and display connection string components (mask password)
   try {
     const url = new URL(connectionString)
