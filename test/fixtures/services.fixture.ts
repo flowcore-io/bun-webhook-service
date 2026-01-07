@@ -6,11 +6,14 @@ export const servicesUp = async () => {
   console.log("➖ Starting services...")
   // Print connection strings for debugging
   const pgConn = process.env.POSTGRES_CONNECTION_STRING || 'not set'
+  const pgPreview = pgConn.length > 60 ? `${pgConn.substring(0, 60)}...` : pgConn
+  console.log(`📋 PostgreSQL (raw, length ${pgConn.length}): ${pgPreview}`)
   try {
     const pgUrl = new URL(pgConn)
-    console.log(`📋 PostgreSQL: ${pgUrl.protocol}//${pgUrl.username}:****@${pgUrl.hostname}:${pgUrl.port}${pgUrl.pathname}`)
-  } catch {
-    console.log(`📋 PostgreSQL (raw): ${pgConn}`)
+    console.log(`📋 PostgreSQL (parsed): ${pgUrl.protocol}//${pgUrl.username}:****@${pgUrl.hostname}:${pgUrl.port}${pgUrl.pathname}`)
+  } catch (e) {
+    console.log(`📋 PostgreSQL (parse failed): ${pgConn}`)
+    console.log(`📋 Parse error: ${e}`)
   }
   console.log(`📋 NATS: ${process.env.NATS_URL || 'not set'}`)
   console.log(`📋 Redis Sentinel: ${process.env.REDIS_SENTINEL_HOSTS || 'not set'}`)
