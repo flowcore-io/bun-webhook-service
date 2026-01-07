@@ -119,7 +119,7 @@ export const servicesResetAndMigrate = async () => {
   const _start = performance.now()
   
   // Print connection string for debugging
-  const connectionString = process.env.POSTGRES_CONNECTION_STRING || "not set"
+  let connectionString = process.env.POSTGRES_CONNECTION_STRING || "not set"
   // Show first 70 chars to see the actual format (without masking)
   const preview = connectionString.length > 70 ? `${connectionString.substring(0, 70)}...` : connectionString
   console.log(`📋 PostgreSQL connection string (raw, length ${connectionString.length}): ${preview}`)
