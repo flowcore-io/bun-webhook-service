@@ -1,70 +1,73 @@
-import { $ } from "bun"
-import { sql } from "drizzle-orm"
+import { $ } from "bun";
+import { sql } from "drizzle-orm";
 
 export const servicesUp = async () => {
-  process.stdout.write("➖ Starting services: ")
-  const exitCode = await (await $`docker compose up --wait -d`.cwd("./test").quiet()).exitCode
+  process.stdout.write("➖ Starting services: ");
+  const exitCode = await (await $`docker compose up --wait -d`.cwd("./test").quiet()).exitCode;
   if (exitCode !== 0) {
-    throw new Error("Failed to start services")
+    throw new Error("Failed to start services");
   }
-  console.log("✅")
-}
+  console.log("✅");
+};
 
 export const servicesDown = async () => {
-  process.stdout.write("➖ Stopping services: ")
-  const exitCode = await (await $`docker compose down -v --remove-orphans`.cwd("./test").quiet()).exitCode
+  process.stdout.write("➖ Stopping services: ");
+  const exitCode = await (await $`docker compose down -v --remove-orphans`.cwd("./test").quiet())
+    .exitCode;
   if (exitCode !== 0) {
-    throw new Error("Failed to stop services")
+    throw new Error("Failed to stop services");
   }
-  console.log("✅")
-}
+  console.log("✅");
+};
 
 export const servicesResetAndMigrate = async () => {
-  process.stdout.write("➖ Resetting and migrating services: ")
-  const _start = performance.now()
-  
+  process.stdout.write("➖ Resetting and migrating services: ");
+  const _start = performance.now();
+
   // Wait for PostgreSQL to be ready using pg_isready
-  let retries = 30
+  let retries = 30;
   while (retries > 0) {
-    const pgReadyResult = await $`docker compose exec -T test-postgres pg_isready -U postgres`.cwd("./test").quiet()
+    const pgReadyResult = await $`docker compose exec -T test-postgres pg_isready -U postgres`
+      .cwd("./test")
+      .quiet();
     if (pgReadyResult.exitCode === 0) {
-      break
+      break;
     }
     if (retries === 1) {
-      throw new Error("PostgreSQL did not become ready in time")
+      throw new Error("PostgreSQL did not become ready in time");
     }
-    await Bun.sleep(500)
-    retries--
+    await Bun.sleep(500);
+    retries--;
   }
-  
+
   // Import database - environment variables should be set by test/setup.ts
   // node-postgres Pool creates connections lazily, so connection happens on first query
-  const { db } = await import("@/database")
-  
-  await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE`)
-  await db.execute(sql`CREATE SCHEMA public`)
+  const { db } = await import("@/database");
+
+  await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE`);
+  await db.execute(sql`CREATE SCHEMA public`);
   const exitCode = await Bun.spawn(["bun", "--env-file=.env.test", "drizzle-kit", "push"], {
     cwd: "./",
     stdout: "ignore",
     stderr: "inherit",
-  }).exited
+  }).exited;
   if (exitCode !== 0) {
-    throw new Error("Failed to migrate database")
+    throw new Error("Failed to migrate database");
   }
-  console.log("✅")
-}
+  console.log("✅");
+};
 
 // CLI interface for manual service management
 if (import.meta.url === `file://${process.argv[1]}` && Bun.env.NODE_ENV === "test") {
-  console.log("Running services fixture")
+  console.log("Running services fixture");
   switch (process.argv[2]) {
     case "action:up":
-      await servicesUp()
-      await servicesResetAndMigrate()
-      break
+      await servicesUp();
+      await servicesResetAndMigrate();
+      break;
     case "action:down":
-      await servicesDown()
-      break
+      await servicesDown();
+      break;
   }
-  process.exit(0)
+  process.exit(0);
 }

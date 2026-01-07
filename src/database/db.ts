@@ -1,16 +1,16 @@
-import * as schemas from "./tables"
-import env from "@/env"
-import { drizzle } from "drizzle-orm/node-postgres"
-import { Pool } from "pg"
+import env from "@/env";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import * as schemas from "./tables";
 
 // Use process.env directly to ensure we get the latest value, especially in tests
-const connectionString = process.env.POSTGRES_CONNECTION_STRING || env.POSTGRES_CONNECTION_STRING
+const connectionString = process.env.POSTGRES_CONNECTION_STRING || env.POSTGRES_CONNECTION_STRING;
 
 const pool = new Pool({
-	connectionString,
-})
+  connectionString,
+});
 
 export const db = drizzle(pool, {
-	schema: schemas,
-	logger: env.POSTGRES_LOG_QUERY,
-})
+  schema: schemas,
+  logger: env.POSTGRES_LOG_QUERY,
+});

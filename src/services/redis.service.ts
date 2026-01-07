@@ -10,9 +10,10 @@ class RedisService {
 			return
 		}
 
-		const sentinelHosts = env.REDIS_SENTINEL_HOSTS
-		const masterName = env.REDIS_SENTINEL_MASTER_NAME || "mymaster"
-		const password = env.REDIS_PASSWORD
+		// Read from process.env directly to ensure we get the latest value, especially in tests
+		const sentinelHosts = process.env.REDIS_SENTINEL_HOSTS || env.REDIS_SENTINEL_HOSTS
+		const masterName = process.env.REDIS_SENTINEL_MASTER_NAME || env.REDIS_SENTINEL_MASTER_NAME || "mymaster"
+		const password = process.env.REDIS_PASSWORD || env.REDIS_PASSWORD
 
 		if (sentinelHosts) {
 			// Use Redis Sentinel

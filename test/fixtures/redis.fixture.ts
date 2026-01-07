@@ -27,6 +27,9 @@ export class RedisFixture {
 					const delay = Math.min(times * 50, 2000)
 					return delay
 				},
+				maxRetriesPerRequest: 3,
+				enableReadyCheck: true,
+				lazyConnect: false,
 			})
 		} else {
 			// Fallback to direct Redis connection
@@ -34,11 +37,26 @@ export class RedisFixture {
 				host: "localhost",
 				port: 6379,
 				password,
+				maxRetriesPerRequest: 3,
+				enableReadyCheck: true,
+				lazyConnect: false,
 			})
 		}
 
-		// Wait for connection
-		await this.client.ping()
+		// Wait for connection with retries
+		let retries = 30
+		while (retries > 0) {
+			try {
+				await this.client.ping()
+				return
+			} catch (error) {
+				if (retries === 1) {
+					throw error
+				}
+				await Bun.sleep(500)
+				retries--
+			}
+		}
 	}
 
 	async disconnect(): Promise<void> {
