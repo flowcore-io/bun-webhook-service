@@ -103,9 +103,11 @@ export const servicesResetAndMigrate = async () => {
   }
   
   // First, wait for PostgreSQL to be ready using pg_isready
+  // Use 127.0.0.1 instead of localhost in CI environments (GitHub Actions)
+  const pgHost = process.env.CI === "true" ? "127.0.0.1" : "localhost"
   let pgReadyRetries = 30
   while (pgReadyRetries > 0) {
-    const pgReadyResult = await $`pg_isready -h localhost -p 54321 -U postgres`.quiet().nothrow()
+    const pgReadyResult = await $`pg_isready -h ${pgHost} -p 54321 -U postgres`.quiet().nothrow()
     if (pgReadyResult.exitCode === 0) {
       console.log("✅ PostgreSQL is ready (pg_isready)")
       break
