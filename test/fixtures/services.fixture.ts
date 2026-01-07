@@ -40,6 +40,8 @@ export const servicesUp = async () => {
     
     if (allRunning && requiredHealthy && containers.length >= requiredServices.length) {
       console.log("✅")
+      // Small delay to ensure PostgreSQL is fully ready to accept connections
+      await Bun.sleep(2000)
       return
     }
     await Bun.sleep(1000)
