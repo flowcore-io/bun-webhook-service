@@ -6,7 +6,8 @@ export const servicesUp = async () => {
   console.log("➖ Starting services...")
   // Print connection strings for debugging
   const pgConn = process.env.POSTGRES_CONNECTION_STRING || 'not set'
-  const pgPreview = pgConn.length > 60 ? `${pgConn.substring(0, 60)}...` : pgConn
+  // Show full connection string (first 70 chars) to see actual format
+  const pgPreview = pgConn.length > 70 ? `${pgConn.substring(0, 70)}...` : pgConn
   console.log(`📋 PostgreSQL (raw, length ${pgConn.length}): ${pgPreview}`)
   try {
     const pgUrl = new URL(pgConn)
@@ -85,8 +86,8 @@ export const servicesResetAndMigrate = async () => {
   
   // Print connection string for debugging
   const connectionString = process.env.POSTGRES_CONNECTION_STRING || "not set"
-  // Show first 60 chars to see the actual format (without masking)
-  const preview = connectionString.length > 60 ? connectionString.substring(0, 60) + "..." : connectionString
+  // Show first 70 chars to see the actual format (without masking)
+  const preview = connectionString.length > 70 ? `${connectionString.substring(0, 70)}...` : connectionString
   console.log(`📋 PostgreSQL connection string (raw, length ${connectionString.length}): ${preview}`)
   // Parse and display connection string components (mask password)
   try {
