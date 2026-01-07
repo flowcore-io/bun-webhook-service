@@ -5,6 +5,19 @@ import { sql } from "drizzle-orm"
 
 export const servicesUp = async () => {
   console.log("➖ Starting services...")
+  // Ensure connection strings are set for CI environments
+  if (!process.env.POSTGRES_CONNECTION_STRING) {
+    const dbHost = process.env.CI === "true" ? "127.0.0.1" : "localhost"
+    process.env.POSTGRES_CONNECTION_STRING = `postgresql://postgres:test@${dbHost}:54321/bun_webhook_service_test`
+  }
+  if (!process.env.REDIS_SENTINEL_HOSTS) {
+    const redisHost = process.env.CI === "true" ? "127.0.0.1" : "localhost"
+    process.env.REDIS_SENTINEL_HOSTS = `${redisHost}:26380`
+  }
+  if (!process.env.NATS_URL) {
+    const natsHost = process.env.CI === "true" ? "127.0.0.1" : "localhost"
+    process.env.NATS_URL = `nats://${natsHost}:14222`
+  }
   // Print connection strings for debugging
   const pgConn = process.env.POSTGRES_CONNECTION_STRING || 'not set'
   // Log the actual connection string characters (first 70) to see what we're getting
