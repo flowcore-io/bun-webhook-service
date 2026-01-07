@@ -65,18 +65,21 @@ export const servicesDown = async () => {
 }
 
 export const servicesResetAndMigrate = async () => {
-  process.stdout.write("➖ Resetting and migrating services: ")
+  console.log("➖ Resetting and migrating services...")
   const _start = performance.now()
   
-  // Wait for PostgreSQL to be ready
-  let retries = 30
+  // Wait for PostgreSQL to be ready - increase retries and wait time
+  let retries = 60 // Increased from 30 to 60
   while (retries > 0) {
     try {
       await db.execute(sql`SELECT 1`)
       break
     } catch (error) {
-      if (retries === 1) throw error
-      await Bun.sleep(500)
+      if (retries === 1) {
+        console.error("Failed to connect to PostgreSQL:", error)
+        throw error
+      }
+      await Bun.sleep(1000) // Increased from 500ms to 1000ms
       retries--
     }
   }
