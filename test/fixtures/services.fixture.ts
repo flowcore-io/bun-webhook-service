@@ -4,11 +4,35 @@ import { sql } from "drizzle-orm"
 
 export const servicesUp = async () => {
   process.stdout.write("➖ Starting services: ")
-  const exitCode = await (await $`docker compose up --wait -d`.cwd("./test").quiet()).exitCode
+  // Start services without --wait to avoid NATS healthcheck issues
+  const exitCode = await (await $`docker compose up -d`.cwd("./test").quiet()).exitCode
   if (exitCode !== 0) {
     throw new Error("Failed to start services")
   }
-  console.log("✅")
+  // Wait for critical services manually
+  let retries = 60
+  while (retries > 0) {
+    const statusResult = await $`docker compose ps --format json`.cwd("./test").quiet()
+    const status = await statusResult.text()
+    const containers = JSON.parse(`[${status.split("\n").filter(Boolean).join(",")}]`)
+    const postgres = containers.find((c: { Service: string }) => c.Service === "test-postgres")
+    const redis = containers.find((c: { Service: string }) => c.Service === "test-redis")
+    const sentinel = containers.find((c: { Service: string }) => c.Service === "test-redis-sentinel")
+    if (
+      postgres?.State === "running" &&
+      (postgres?.Health === "healthy" || !postgres?.Health) &&
+      redis?.State === "running" &&
+      (redis?.Health === "healthy" || !redis?.Health) &&
+      sentinel?.State === "running" &&
+      (sentinel?.Health === "healthy" || !sentinel?.Health)
+    ) {
+      console.log("✅")
+      return
+    }
+    await Bun.sleep(1000)
+    retries--
+  }
+  throw new Error("Services did not become healthy in time")
 }
 
 export const servicesDown = async () => {
