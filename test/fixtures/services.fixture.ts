@@ -80,8 +80,10 @@ export const servicesResetAndMigrate = async () => {
   try {
     const url = new URL(connectionString)
     console.log(`📋 PostgreSQL connection string: ${url.protocol}//${url.username}:****@${url.hostname}:${url.port}${url.pathname}`)
-  } catch {
-    console.log(`📋 PostgreSQL connection string (raw): ${connectionString}`)
+    console.log(`📋 Full connection string (masked): ${connectionString.replace(/:([^:@]+)@/, ':****@')}`)
+  } catch (e) {
+    console.log(`📋 PostgreSQL connection string (raw, parse failed): ${connectionString}`)
+    console.log(`📋 Parse error: ${e}`)
   }
   
   // First, wait for PostgreSQL to be ready using pg_isready
