@@ -82,7 +82,12 @@ beforeEach(
 	async () => {
 		// Clean up test data
 		await testDb.truncateAll()
-		await redisFixture.clear()
+		try {
+			await redisFixture.clear()
+		} catch (error) {
+			// Redis might not be connected yet, ignore errors during cleanup
+			console.warn("Redis clear failed, continuing:", error)
+		}
 
 	// Setup: Create test resources using application's database interface
 	// Use proper UUIDs for IDs
