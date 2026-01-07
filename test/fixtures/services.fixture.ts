@@ -76,7 +76,13 @@ export const servicesResetAndMigrate = async () => {
   
   // Print connection string for debugging
   const connectionString = process.env.POSTGRES_CONNECTION_STRING || "not set"
-  console.log(`📋 PostgreSQL connection string: ${connectionString.replace(/:[^:@]+@/, ':****@')}`) // Mask password
+  // Parse and display connection string components (mask password)
+  try {
+    const url = new URL(connectionString)
+    console.log(`📋 PostgreSQL connection string: ${url.protocol}//${url.username}:****@${url.hostname}:${url.port}${url.pathname}`)
+  } catch {
+    console.log(`📋 PostgreSQL connection string (raw): ${connectionString}`)
+  }
   
   // First, wait for PostgreSQL to be ready using pg_isready
   let pgReadyRetries = 30
