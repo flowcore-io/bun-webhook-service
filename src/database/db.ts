@@ -1,12 +1,13 @@
 import * as schemas from "./tables"
 import env from "@/env"
-import { drizzle } from "drizzle-orm/bun-sql"
-import { SQL } from "bun"
+import { drizzle } from "drizzle-orm/node-postgres"
+import { Pool } from "pg"
 
-const client = new SQL(env.POSTGRES_CONNECTION_STRING)
+const pool = new Pool({
+	connectionString: env.POSTGRES_CONNECTION_STRING,
+})
 
-export const db = drizzle({
-	client,
+export const db = drizzle(pool, {
 	schema: schemas,
 	logger: env.POSTGRES_LOG_QUERY,
 })

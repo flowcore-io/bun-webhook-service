@@ -18,18 +18,18 @@ if (!process.env.NATS_URL) {
 	process.env.NATS_URL = `nats://${natsHost}:14222`
 }
 
-import env from "@/env";
-import { zBooleanString } from "@flowcore/hono-api";
-import { AppFixture } from "@root/test/fixtures/app.fixture";
-import { AuthFixture } from "@root/test/fixtures/auth.fixture";
+import env from "@/env"
+import { zBooleanString } from "@flowcore/hono-api"
+import { AppFixture } from "@root/test/fixtures/app.fixture"
+import { AuthFixture } from "@root/test/fixtures/auth.fixture"
 import {
   servicesDown,
   servicesResetAndMigrate,
   servicesUp,
-} from "@root/test/fixtures/services.fixture";
-import { WebhookTestFixture } from "@root/test/fixtures/webhook.fixture";
-import { afterAll, afterEach, beforeAll, beforeEach } from "bun:test";
-import { mockFlowcoreClientAssertConsumed } from "./mocks/flowcore-sdk";
+} from "@root/test/fixtures/services.fixture"
+import { WebhookTestFixture } from "@root/test/fixtures/webhook.fixture"
+import { afterAll, afterEach, beforeAll, beforeEach } from "bun:test"
+import { mockFlowcoreClientAssertConsumed } from "./mocks/flowcore-sdk"
 
 // Export fixtures for use in tests
 export const appFixture = new AppFixture();
