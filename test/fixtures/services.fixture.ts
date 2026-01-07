@@ -23,8 +23,19 @@ export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
   
-  // Small delay to ensure database is ready after healthcheck passes
-  await Bun.sleep(1000)
+  // Wait for PostgreSQL to be ready using pg_isready
+  let retries = 30
+  while (retries > 0) {
+    const pgReadyResult = await $`docker compose exec -T test-postgres pg_isready -U postgres`.cwd("./test").quiet()
+    if (pgReadyResult.exitCode === 0) {
+      break
+    }
+    if (retries === 1) {
+      throw new Error("PostgreSQL did not become ready in time")
+    }
+    await Bun.sleep(500)
+    retries--
+  }
   
   // Import database - environment variables should be set by test/setup.ts
   // node-postgres Pool creates connections lazily, so connection happens on first query
