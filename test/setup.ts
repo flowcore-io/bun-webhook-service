@@ -26,14 +26,14 @@ import env from "@/env";
 import { zBooleanString } from "@flowcore/hono-api";
 import { AppFixture } from "@root/test/fixtures/app.fixture";
 import { AuthFixture } from "@root/test/fixtures/auth.fixture";
+import { NatsFixture } from "@root/test/fixtures/nats.fixture";
+import { RedisFixture } from "@root/test/fixtures/redis.fixture";
 import {
   servicesDown,
   servicesResetAndMigrate,
   servicesUp,
 } from "@root/test/fixtures/services.fixture";
 import { WebhookTestFixture } from "@root/test/fixtures/webhook.fixture";
-import { NatsFixture } from "@root/test/fixtures/nats.fixture";
-import { RedisFixture } from "@root/test/fixtures/redis.fixture";
 import { afterAll, afterEach, beforeAll } from "bun:test";
 import { mockFlowcoreClientAssertConsumed } from "./mocks/flowcore-sdk";
 
