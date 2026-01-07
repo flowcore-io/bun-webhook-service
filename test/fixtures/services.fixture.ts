@@ -134,6 +134,11 @@ export const servicesResetAndMigrate = async () => {
   
   // First, wait for PostgreSQL to be ready using pg_isready
   // Use 127.0.0.1 instead of localhost in CI environments (GitHub Actions)
+  // Also ensure connection string uses 127.0.0.1 in CI
+  if (process.env.CI === "true" && connectionString.includes("localhost")) {
+    connectionString = connectionString.replace(/localhost/g, "127.0.0.1")
+    process.env.POSTGRES_CONNECTION_STRING = connectionString
+  }
   const pgHost = process.env.CI === "true" ? "127.0.0.1" : "localhost"
   let pgReadyRetries = 30
   while (pgReadyRetries > 0) {
