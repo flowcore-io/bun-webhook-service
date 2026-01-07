@@ -47,6 +47,22 @@ export const servicesDown = async () => {
 export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
+  
+  // Wait for database to be ready
+  let retries = 30
+  while (retries > 0) {
+    try {
+      await db.execute(sql`SELECT 1`)
+      break
+    } catch (error) {
+      if (retries === 1) {
+        throw error
+      }
+      await Bun.sleep(1000)
+      retries--
+    }
+  }
+  
   await db.execute(sql`DROP SCHEMA public CASCADE`)
   await db.execute(sql`CREATE SCHEMA public`)
   const exitCode = await Bun.spawn(["bun", "--env-file=.env.test", "drizzle-kit", "push"], {
