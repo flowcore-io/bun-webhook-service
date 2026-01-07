@@ -32,6 +32,8 @@ import {
   servicesUp,
 } from "@root/test/fixtures/services.fixture";
 import { WebhookTestFixture } from "@root/test/fixtures/webhook.fixture";
+import { NatsFixture } from "@root/test/fixtures/nats.fixture";
+import { RedisFixture } from "@root/test/fixtures/redis.fixture";
 import { afterAll, afterEach, beforeAll } from "bun:test";
 import { mockFlowcoreClientAssertConsumed } from "./mocks/flowcore-sdk";
 
@@ -51,6 +53,15 @@ export const webhookFixtureClient = new WebhookTestFixture({
   transformerUrl: `http://localhost:${env.SERVICE_PORT}/transformer`,
 });
 
+// Create NATS and Redis fixtures
+export const natsFixture = new NatsFixture();
+export const redisFixture = new RedisFixture();
+
+// Test configuration
+const NATS_URL = process.env.NATS_URL || "nats://localhost:14222";
+const REDIS_SENTINEL_HOSTS = process.env.REDIS_SENTINEL_HOSTS || "localhost:26380";
+const REDIS_MASTER_NAME = process.env.REDIS_SENTINEL_MASTER_NAME || "mymaster";
+
 // Detect CI environment
 const isCI = zBooleanString.default(false).parse(Bun.env.CI);
 
@@ -62,11 +73,19 @@ beforeAll(
       await servicesUp();
     }
     await servicesResetAndMigrate();
+
+    // Connect to real NATS server
+    await natsFixture.connect(NATS_URL);
+
+    // Connect to real Redis Sentinel
+    await redisFixture.connect(REDIS_SENTINEL_HOSTS.split(","), REDIS_MASTER_NAME);
   },
   120000 // 120 second timeout for setup (services can take up to 60s to start)
 );
 
 afterAll(async () => {
+  await natsFixture.disconnect();
+  await redisFixture.disconnect();
   // In CI, stop Docker services
   if (isCI) {
     await servicesDown();

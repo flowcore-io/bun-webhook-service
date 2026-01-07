@@ -1,15 +1,11 @@
 // Black-box tests for ingestion endpoints
 // Tests only through public HTTP API endpoints - no imports from /src
 
-// Import setup first to set environment variables before any other imports
-import "./ingestion.setup";
-
 // Use a different port to avoid conflicts with global test setup
 // Must be set before importing fixtures that read env.SERVICE_PORT
 process.env.SERVICE_PORT = "3001";
 
-import { zBooleanString } from "@flowcore/hono-api";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   HEADER_EVENT_TIME,
   HEADER_EVENT_TIME_KEY,
@@ -20,51 +16,9 @@ import {
   TOPIC_GUARANTEED_INGESTION_CHANNEL,
 } from "../../src/constants/ingestion.constants";
 import { TestDatabase } from "../fixtures/db.fixture";
-import { NatsFixture } from "../fixtures/nats.fixture";
-import { RedisFixture } from "../fixtures/redis.fixture";
-import { servicesDown, servicesResetAndMigrate, servicesUp } from "../fixtures/services.fixture";
-import { appFixture, authFixture, webhookFixtureClient } from "../setup";
+import { appFixture, authFixture, natsFixture, redisFixture, webhookFixtureClient } from "../setup";
 
 const testDb = new TestDatabase();
-const natsFixture = new NatsFixture();
-const redisFixture = new RedisFixture();
-
-// Test configuration - use environment variables directly
-const NATS_URL = process.env.NATS_URL || "nats://localhost:14222";
-const REDIS_SENTINEL_HOSTS = process.env.REDIS_SENTINEL_HOSTS || "localhost:26380";
-const REDIS_MASTER_NAME = process.env.REDIS_SENTINEL_MASTER_NAME || "mymaster";
-
-// Detect CI environment
-const isCI = zBooleanString.default(false).parse(Bun.env.CI);
-
-beforeAll(
-  async () => {
-    // In CI, start Docker services
-    // In local dev, assume user has run test:services:up manually
-    if (isCI) {
-      await servicesUp();
-    }
-
-    // Always reset and migrate database (assumes services are running)
-    await servicesResetAndMigrate();
-
-    // Connect to real NATS server
-    await natsFixture.connect(NATS_URL);
-
-    // Connect to real Redis Sentinel
-    await redisFixture.connect(REDIS_SENTINEL_HOSTS.split(","), REDIS_MASTER_NAME);
-  },
-  60000 // 60 second timeout for setup
-);
-
-afterAll(async () => {
-  await natsFixture.disconnect();
-  await redisFixture.disconnect();
-  // Only stop services in CI
-  if (isCI) {
-    await servicesDown();
-  }
-});
 
 beforeEach(
   async () => {
