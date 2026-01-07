@@ -23,8 +23,26 @@ export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
   
+  // Wait a bit for database to be fully ready after healthcheck passes
+  await Bun.sleep(2000)
+  
   // Dynamically import database to ensure environment variables are set
   const { db } = await import("@/database")
+  
+  // Retry database connection
+  let retries = 10
+  while (retries > 0) {
+    try {
+      await db.execute(sql`SELECT 1`)
+      break
+    } catch (error) {
+      if (retries === 1) {
+        throw error
+      }
+      await Bun.sleep(1000)
+      retries--
+    }
+  }
   
   await db.execute(sql`DROP SCHEMA public CASCADE`)
   await db.execute(sql`CREATE SCHEMA public`)
