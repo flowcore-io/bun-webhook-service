@@ -121,8 +121,13 @@ export const servicesResetAndMigrate = async () => {
   await Bun.sleep(2000)
   
   // Now try to connect with the database client
-  // Log what the database client is actually using
-  console.log(`📋 Database client connection string (from env, length ${env.POSTGRES_CONNECTION_STRING.length}): ${env.POSTGRES_CONNECTION_STRING.substring(0, 70)}${env.POSTGRES_CONNECTION_STRING.length > 70 ? '...' : ''}`)
+  // Log what the database client is actually using (from env module if available)
+  try {
+    const env = await import("@/env")
+    console.log(`📋 Database client connection string (from env module, length ${env.default.POSTGRES_CONNECTION_STRING.length}): ${env.default.POSTGRES_CONNECTION_STRING.substring(0, 70)}${env.default.POSTGRES_CONNECTION_STRING.length > 70 ? '...' : ''}`)
+  } catch (e) {
+    console.log(`📋 Could not load env module: ${e}`)
+  }
   
   let retries = 30
   while (retries > 0) {
