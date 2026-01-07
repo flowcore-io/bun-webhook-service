@@ -29,9 +29,8 @@ services:
       - "14222:4222" # NATS client port (mapped to 14222 to avoid conflicts)
       - "18222:8222" # Monitoring port (mapped to 18222 to avoid conflicts)
     command: ["-m", "8222"] # Monitoring port, no JetStream
-    # Check if NATS process is running (simple and reliable)
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'nats-server' > /dev/null || exit 1"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/healthz"]
       interval: 5s
       timeout: 5s
       retries: 10
