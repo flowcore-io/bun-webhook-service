@@ -1,101 +1,14 @@
 import { db } from "@/database"
-import env from "@/env"
 import { $ } from "bun"
 import { sql } from "drizzle-orm"
 
 export const servicesUp = async () => {
-  console.log("➖ Starting services...")
-  // Ensure connection strings use 127.0.0.1 in CI environments (GitHub Actions)
-  // Replace localhost with 127.0.0.1 if in CI
-  if (process.env.CI === "true") {
-    if (process.env.POSTGRES_CONNECTION_STRING) {
-      process.env.POSTGRES_CONNECTION_STRING = process.env.POSTGRES_CONNECTION_STRING.replace(/localhost/g, "127.0.0.1")
-    } else {
-      process.env.POSTGRES_CONNECTION_STRING = "postgresql://postgres:test@127.0.0.1:54321/bun_webhook_service_test"
-    }
-    if (process.env.REDIS_SENTINEL_HOSTS) {
-      process.env.REDIS_SENTINEL_HOSTS = process.env.REDIS_SENTINEL_HOSTS.replace(/localhost/g, "127.0.0.1")
-    } else {
-      process.env.REDIS_SENTINEL_HOSTS = "127.0.0.1:26380"
-    }
-    if (process.env.NATS_URL) {
-      process.env.NATS_URL = process.env.NATS_URL.replace(/localhost/g, "127.0.0.1")
-    } else {
-      process.env.NATS_URL = "nats://127.0.0.1:14222"
-    }
-  } else {
-    // Local development - use localhost if not set
-    if (!process.env.POSTGRES_CONNECTION_STRING) {
-      process.env.POSTGRES_CONNECTION_STRING = "postgresql://postgres:test@localhost:54321/bun_webhook_service_test"
-    }
-    if (!process.env.REDIS_SENTINEL_HOSTS) {
-      process.env.REDIS_SENTINEL_HOSTS = "localhost:26380"
-    }
-    if (!process.env.NATS_URL) {
-      process.env.NATS_URL = "nats://localhost:14222"
-    }
-  }
-  // Print connection strings for debugging
-  const pgConn = process.env.POSTGRES_CONNECTION_STRING || 'not set'
-  // Log the actual connection string characters (first 70) to see what we're getting
-  console.log(`📋 PostgreSQL (raw, length ${pgConn.length}): ${pgConn.substring(0, 70)}${pgConn.length > 70 ? '...' : ''}`)
-  // Also log character codes to debug any hidden characters
-  const firstChars = pgConn.substring(0, 20).split('').map(c => `${c.charCodeAt(0)}(${c})`).join(' ')
-  console.log(`📋 PostgreSQL (first 20 chars as codes): ${firstChars}`)
-  try {
-    const pgUrl = new URL(pgConn)
-    console.log(`📋 PostgreSQL (parsed components): protocol="${pgUrl.protocol}", username="${pgUrl.username}", hostname="${pgUrl.hostname}", port="${pgUrl.port}", pathname="${pgUrl.pathname}"`)
-    console.log(`📋 PostgreSQL (formatted): ${pgUrl.protocol}//${pgUrl.username || '(no user)'}:****@${pgUrl.hostname}:${pgUrl.port}${pgUrl.pathname}`)
-  } catch (e) {
-    console.log(`📋 PostgreSQL (parse failed): ${pgConn}`)
-    console.log(`📋 Parse error: ${e}`)
-  }
-  console.log(`📋 NATS: ${process.env.NATS_URL || 'not set'}`)
-  console.log(`📋 Redis Sentinel: ${process.env.REDIS_SENTINEL_HOSTS || 'not set'}`)
-  // In CI: clean environment, just start services normally
-  // Local dev: user controls services manually
-  const result = await $`docker compose up -d`.cwd("./test")
-  // Output docker compose logs
-  if (result.stdout) {
-    console.log(result.stdout.toString())
-  }
-  if (result.exitCode !== 0) {
-    if (result.stderr) {
-      console.error(result.stderr.toString())
-    }
+  process.stdout.write("➖ Starting services: ")
+  const exitCode = await (await $`docker compose up --wait -d`.cwd("./test").quiet()).exitCode
+  if (exitCode !== 0) {
     throw new Error("Failed to start services")
   }
-  
-  // Wait for services to be healthy manually
-  // Key services that must be healthy: postgres, redis, redis-sentinel
-  const requiredServices = ["test-postgres", "test-redis", "test-redis-sentinel"]
-  let retries = 60 // Increased timeout for Sentinel startup
-  while (retries > 0) {
-    const statusResult = await $`docker compose ps --format json`.cwd("./test").quiet()
-    const status = await statusResult.text()
-    const containers = JSON.parse(`[${status.split("\n").filter(Boolean).join(",")}]`)
-    
-    // Check that all containers are running
-    const allRunning = containers.every((c: { State: string }) => c.State === "running")
-    
-    // Check that required services are healthy
-    const requiredHealthy = requiredServices.every((serviceName) => {
-      const container = containers.find((c: { Service: string }) => c.Service === serviceName)
-      if (!container) return false
-      // Must be running and either no healthcheck or healthy
-      return container.State === "running" && (!container.Health || container.Health === "healthy")
-    })
-    
-    if (allRunning && requiredHealthy && containers.length >= requiredServices.length) {
-      console.log("✅")
-      // Small delay to ensure PostgreSQL is fully ready to accept connections
-      await Bun.sleep(2000)
-      return
-    }
-    await Bun.sleep(1000)
-    retries--
-  }
-  console.log("⚠️  (some services may not be fully ready)")
+  console.log("✅")
 }
 
 export const servicesDown = async () => {
