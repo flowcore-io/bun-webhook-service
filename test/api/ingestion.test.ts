@@ -9,7 +9,7 @@ import "./ingestion.setup";
 process.env.SERVICE_PORT = "3001";
 
 import { zBooleanString } from "@flowcore/hono-api";
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import {
   HEADER_EVENT_TIME,
   HEADER_EVENT_TIME_KEY,
@@ -23,7 +23,7 @@ import { TestDatabase } from "../fixtures/db.fixture";
 import { NatsFixture } from "../fixtures/nats.fixture";
 import { RedisFixture } from "../fixtures/redis.fixture";
 import { servicesDown, servicesResetAndMigrate, servicesUp } from "../fixtures/services.fixture";
-import { appFixture, authFixture } from "../setup";
+import { appFixture, authFixture, webhookFixtureClient } from "../setup";
 
 const testDb = new TestDatabase();
 const natsFixture = new NatsFixture();
