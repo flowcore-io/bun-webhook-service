@@ -3,9 +3,9 @@ import { zBooleanString } from "@flowcore/hono-api";
 import { AppFixture } from "@root/test/fixtures/app.fixture";
 import { AuthFixture } from "@root/test/fixtures/auth.fixture";
 import {
-	servicesDown,
-	servicesResetAndMigrate,
-	servicesUp,
+  servicesDown,
+  servicesResetAndMigrate,
+  servicesUp,
 } from "@root/test/fixtures/services.fixture";
 import { WebhookTestFixture } from "@root/test/fixtures/webhook.fixture";
 import { afterAll, afterEach, beforeAll, beforeEach } from "bun:test";
@@ -31,17 +31,20 @@ export const webhookFixtureClient = new WebhookTestFixture({
 const isCI = zBooleanString.default(false).parse(Bun.env.CI);
 
 // Setup lifecycle
-beforeAll(async () => {
-	// In CI, start Docker services and migrate database
-	if (isCI) {
-		await servicesUp();
-		await servicesResetAndMigrate();
-	}
-	// Start all test fixtures
-	await appFixture.start();
-	await authFixture.start();
-	await webhookFixtureClient.start();
-});
+beforeAll(
+	async () => {
+		// In CI, start Docker services and migrate database
+		if (isCI) {
+			await servicesUp();
+			await servicesResetAndMigrate();
+		}
+		// Start all test fixtures
+		await appFixture.start();
+		await authFixture.start();
+		await webhookFixtureClient.start();
+	},
+	120000, // 120 second timeout for setup (services can take up to 60s to start)
+);
 
 afterAll(async () => {
 	// In CI, stop Docker services
