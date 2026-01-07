@@ -23,6 +23,9 @@ export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
   
+  // Wait a bit for database to be fully ready after healthcheck passes
+  await Bun.sleep(2000)
+  
   // Import database - environment variables should be set by test/setup.ts
   const { db } = await import("@/database")
   
