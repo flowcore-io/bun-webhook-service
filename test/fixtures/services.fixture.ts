@@ -23,8 +23,11 @@ export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
   
+  // Small delay to ensure database is ready after healthcheck passes
+  await Bun.sleep(1000)
+  
   // Import database - environment variables should be set by test/setup.ts
-  // node-postgres Pool creates connections lazily, so this should work
+  // node-postgres Pool creates connections lazily, so connection happens on first query
   const { db } = await import("@/database")
   
   await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE`)
