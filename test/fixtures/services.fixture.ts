@@ -1,4 +1,5 @@
 import { db } from "@/database"
+import env from "@/env"
 import { $ } from "bun"
 import { sql } from "drizzle-orm"
 
@@ -121,7 +122,6 @@ export const servicesResetAndMigrate = async () => {
   
   // Now try to connect with the database client
   // Log what the database client is actually using
-  import env from "@/env"
   console.log(`📋 Database client connection string (from env, length ${env.POSTGRES_CONNECTION_STRING.length}): ${env.POSTGRES_CONNECTION_STRING.substring(0, 70)}${env.POSTGRES_CONNECTION_STRING.length > 70 ? '...' : ''}`)
   
   let retries = 30
