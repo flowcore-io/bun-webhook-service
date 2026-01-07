@@ -6,12 +6,16 @@ export class AppFixture {
   public readonly baseUrl: string
 
   constructor() {
-    this.baseUrl = `http://localhost:${env.SERVICE_PORT}`
+    // Read from process.env directly to ensure we get the latest value, especially in tests
+    const port = Number(process.env.SERVICE_PORT) || env.SERVICE_PORT
+    this.baseUrl = `http://localhost:${port}`
   }
 
   async start() {
+    // Read from process.env directly to ensure we get the latest value, especially in tests
+    const port = Number(process.env.SERVICE_PORT) || env.SERVICE_PORT
     const server = Bun.serve({
-      port: env.SERVICE_PORT,
+      port,
       fetch: api.app.fetch,
     })
     this.server = server
