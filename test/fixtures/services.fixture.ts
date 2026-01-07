@@ -4,6 +4,10 @@ import { sql } from "drizzle-orm"
 
 export const servicesUp = async () => {
   console.log("➖ Starting services...")
+  // Print connection strings for debugging
+  console.log(`📋 PostgreSQL: ${process.env.POSTGRES_CONNECTION_STRING?.replace(/:[^:@]+@/, ':****@') || 'not set'}`)
+  console.log(`📋 NATS: ${process.env.NATS_URL || 'not set'}`)
+  console.log(`📋 Redis Sentinel: ${process.env.REDIS_SENTINEL_HOSTS || 'not set'}`)
   // In CI: clean environment, just start services normally
   // Local dev: user controls services manually
   const result = await $`docker compose up -d`.cwd("./test")
