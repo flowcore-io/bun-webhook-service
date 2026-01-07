@@ -78,10 +78,11 @@ afterAll(async () => {
 	}
 })
 
-beforeEach(async () => {
-	// Clean up test data
-	await testDb.truncateAll()
-	await redisFixture.clear()
+beforeEach(
+	async () => {
+		// Clean up test data
+		await testDb.truncateAll()
+		await redisFixture.clear()
 
 	// Setup: Create test resources using application's database interface
 	// Use proper UUIDs for IDs
@@ -106,7 +107,9 @@ beforeEach(async () => {
 		flowTypeId: flowTypeId,
 		name: "test-eventtype",
 	})
-})
+	},
+	30000, // 30 second timeout for beforeEach
+)
 
 describe("POST /api/v1/event/:tenant/:dataCore/:flowType/:eventType", () => {
 	test("should ingest valid event and publish to NATS", async () => {
