@@ -70,11 +70,16 @@ export const servicesResetAndMigrate = async () => {
   console.log("➖ Resetting and migrating services...")
   const _start = performance.now()
   
+  // Print connection string for debugging
+  const connectionString = process.env.POSTGRES_CONNECTION_STRING || "not set"
+  console.log(`📋 PostgreSQL connection string: ${connectionString.replace(/:[^:@]+@/, ':****@')}`) // Mask password
+  
   // First, wait for PostgreSQL to be ready using pg_isready
   let pgReadyRetries = 30
   while (pgReadyRetries > 0) {
     const pgReadyResult = await $`pg_isready -h localhost -p 54321 -U postgres`.quiet().nothrow()
     if (pgReadyResult.exitCode === 0) {
+      console.log("✅ PostgreSQL is ready (pg_isready)")
       break
     }
     if (pgReadyRetries === 1) {
@@ -92,10 +97,12 @@ export const servicesResetAndMigrate = async () => {
   while (retries > 0) {
     try {
       await db.execute(sql`SELECT 1`)
+      console.log("✅ Database connection successful")
       break
     } catch (error) {
       if (retries === 1) {
         console.error("Failed to connect to PostgreSQL:", error)
+        console.error(`Connection string used: ${connectionString.replace(/:[^:@]+@/, ':****@')}`)
         throw error
       }
       await Bun.sleep(1000)
