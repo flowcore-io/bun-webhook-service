@@ -3,35 +3,11 @@ import { sql } from "drizzle-orm"
 
 export const servicesUp = async () => {
   process.stdout.write("➖ Starting services: ")
-  // Start services without --wait to avoid NATS healthcheck issues
-  const exitCode = await (await $`docker compose up -d`.cwd("./test").quiet()).exitCode
+  const exitCode = await (await $`docker compose up --wait -d`.cwd("./test").quiet()).exitCode
   if (exitCode !== 0) {
     throw new Error("Failed to start services")
   }
-  // Wait for critical services manually
-  let retries = 60
-  while (retries > 0) {
-    const statusResult = await $`docker compose ps --format json`.cwd("./test").quiet()
-    const status = await statusResult.text()
-    const containers = JSON.parse(`[${status.split("\n").filter(Boolean).join(",")}]`)
-    const postgres = containers.find((c: { Service: string }) => c.Service === "test-postgres")
-    const redis = containers.find((c: { Service: string }) => c.Service === "test-redis")
-    const sentinel = containers.find((c: { Service: string }) => c.Service === "test-redis-sentinel")
-    if (
-      postgres?.State === "running" &&
-      (postgres?.Health === "healthy" || !postgres?.Health) &&
-      redis?.State === "running" &&
-      (redis?.Health === "healthy" || !redis?.Health) &&
-      sentinel?.State === "running" &&
-      (sentinel?.Health === "healthy" || !sentinel?.Health)
-    ) {
-      console.log("✅")
-      return
-    }
-    await Bun.sleep(1000)
-    retries--
-  }
-  throw new Error("Services did not become healthy in time")
+  console.log("✅")
 }
 
 export const servicesDown = async () => {
@@ -47,40 +23,8 @@ export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
   
-  // Wait for PostgreSQL to be ready using pg_isready
-  let retries = 60
-  while (retries > 0) {
-    const pgReadyResult = await $`docker compose exec -T test-postgres pg_isready -U postgres`.cwd("./test").quiet()
-    if (pgReadyResult.exitCode === 0) {
-      break
-    }
-    if (retries === 1) {
-      throw new Error("PostgreSQL did not become ready in time")
-    }
-    await Bun.sleep(1000)
-    retries--
-  }
-  
-  // Wait a bit more for PostgreSQL to fully initialize
-  await Bun.sleep(2000)
-  
   // Dynamically import database to ensure environment variables are set
   const { db } = await import("@/database")
-  
-  // Wait for database connection to work
-  retries = 30
-  while (retries > 0) {
-    try {
-      await db.execute(sql`SELECT 1`)
-      break
-    } catch (error) {
-      if (retries === 1) {
-        throw error
-      }
-      await Bun.sleep(1000)
-      retries--
-    }
-  }
   
   await db.execute(sql`DROP SCHEMA public CASCADE`)
   await db.execute(sql`CREATE SCHEMA public`)
