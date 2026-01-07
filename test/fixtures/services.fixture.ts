@@ -47,11 +47,28 @@ export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
   
+  // Wait for PostgreSQL to be ready using pg_isready
+  let retries = 60
+  while (retries > 0) {
+    const pgReadyResult = await $`docker compose exec -T test-postgres pg_isready -U postgres`.cwd("./test").quiet()
+    if (pgReadyResult.exitCode === 0) {
+      break
+    }
+    if (retries === 1) {
+      throw new Error("PostgreSQL did not become ready in time")
+    }
+    await Bun.sleep(1000)
+    retries--
+  }
+  
+  // Wait a bit more for PostgreSQL to fully initialize
+  await Bun.sleep(2000)
+  
   // Dynamically import database to ensure environment variables are set
   const { db } = await import("@/database")
   
-  // Wait for database to be ready
-  let retries = 30
+  // Wait for database connection to work
+  retries = 30
   while (retries > 0) {
     try {
       await db.execute(sql`SELECT 1`)
