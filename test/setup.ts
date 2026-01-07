@@ -1,6 +1,11 @@
 // Setup environment variables before any imports
 if (!process.env.FLOWCORE_TENANT) process.env.FLOWCORE_TENANT = "test-tenant"
 if (!process.env.FLOWCORE_DATA_CORE) process.env.FLOWCORE_DATA_CORE = "test-datacore"
+if (!process.env.FLOWCORE_JWKS_URL)
+	process.env.FLOWCORE_JWKS_URL = "http://localhost:8888/.well-known/jwks.json"
+if (!process.env.FLOWCORE_IAM_URL) process.env.FLOWCORE_IAM_URL = "http://localhost:8888"
+if (!process.env.FLOWCORE_API_KEY_URL)
+	process.env.FLOWCORE_API_KEY_URL = "http://localhost:8888/api/v1/api-keys"
 if (!process.env.POSTGRES_CONNECTION_STRING) {
 	// Use 127.0.0.1 instead of localhost in CI environments (GitHub Actions)
 	const dbHost = process.env.CI === "true" ? "127.0.0.1" : "localhost"
