@@ -29,12 +29,6 @@ services:
       - "14222:4222" # NATS client port (mapped to 14222 to avoid conflicts)
       - "18222:8222" # Monitoring port (mapped to 18222 to avoid conflicts)
     command: ["-m", "8222"] # Monitoring port, no JetStream
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/healthz"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
 
   test-redis-sentinel:
     image: redis:latest
