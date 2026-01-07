@@ -120,6 +120,10 @@ export const servicesResetAndMigrate = async () => {
   await Bun.sleep(2000)
   
   // Now try to connect with the database client
+  // Log what the database client is actually using
+  import env from "@/env"
+  console.log(`📋 Database client connection string (from env, length ${env.POSTGRES_CONNECTION_STRING.length}): ${env.POSTGRES_CONNECTION_STRING.substring(0, 70)}${env.POSTGRES_CONNECTION_STRING.length > 70 ? '...' : ''}`)
+  
   let retries = 30
   while (retries > 0) {
     try {
@@ -129,7 +133,8 @@ export const servicesResetAndMigrate = async () => {
     } catch (error) {
       if (retries === 1) {
         console.error("Failed to connect to PostgreSQL:", error)
-        console.error(`Connection string used: ${connectionString.replace(/:[^:@]+@/, ':****@')}`)
+        console.error(`Connection string from process.env: ${connectionString.substring(0, 70)}`)
+        console.error(`Connection string from env module: ${env.POSTGRES_CONNECTION_STRING.substring(0, 70)}`)
         throw error
       }
       await Bun.sleep(1000)
