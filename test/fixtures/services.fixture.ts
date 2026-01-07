@@ -5,9 +5,14 @@ import { sql } from "drizzle-orm"
 export const servicesUp = async () => {
   process.stdout.write("➖ Starting services: ")
   // Stop any existing containers first to avoid port conflicts
-  await $`docker compose down -v --remove-orphans`.cwd("./test").quiet()
-  // Start services without --wait to avoid Docker Compose issues
-  const exitCode = await (await $`docker compose up -d`.cwd("./test").quiet()).exitCode
+  // Use down without -v first, then remove orphans, then force recreate
+  await $`docker compose down --remove-orphans`.cwd("./test").quiet().catch(() => {
+    // Ignore errors if containers don't exist
+  })
+  // Small delay to ensure Docker has cleaned up
+  await Bun.sleep(500)
+  // Start services with force recreate to avoid dependency issues
+  const exitCode = await (await $`docker compose up -d --force-recreate --remove-orphans`.cwd("./test").quiet()).exitCode
   if (exitCode !== 0) {
     throw new Error("Failed to start services")
   }
