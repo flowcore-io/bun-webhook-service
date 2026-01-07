@@ -70,8 +70,25 @@ export const servicesResetAndMigrate = async () => {
   console.log("➖ Resetting and migrating services...")
   const _start = performance.now()
   
-  // Wait for PostgreSQL to be ready - increase retries and wait time
-  let retries = 60 // Increased from 30 to 60
+  // First, wait for PostgreSQL to be ready using pg_isready
+  let pgReadyRetries = 30
+  while (pgReadyRetries > 0) {
+    const pgReadyResult = await $`pg_isready -h localhost -p 54321 -U postgres`.quiet().nothrow()
+    if (pgReadyResult.exitCode === 0) {
+      break
+    }
+    if (pgReadyRetries === 1) {
+      throw new Error("PostgreSQL is not ready after 30 retries")
+    }
+    await Bun.sleep(1000)
+    pgReadyRetries--
+  }
+  
+  // Small delay to ensure PostgreSQL is fully ready to accept connections
+  await Bun.sleep(2000)
+  
+  // Now try to connect with the database client
+  let retries = 30
   while (retries > 0) {
     try {
       await db.execute(sql`SELECT 1`)
@@ -81,7 +98,7 @@ export const servicesResetAndMigrate = async () => {
         console.error("Failed to connect to PostgreSQL:", error)
         throw error
       }
-      await Bun.sleep(1000) // Increased from 500ms to 1000ms
+      await Bun.sleep(1000)
       retries--
     }
   }
