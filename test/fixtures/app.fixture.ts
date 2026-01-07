@@ -3,15 +3,24 @@ import env from "@/env"
 
 export class AppFixture {
   private server?: ReturnType<typeof Bun.serve>
-  public readonly baseUrl: string
+  private _port?: number
 
   constructor() {
-    this.baseUrl = `http://localhost:${env.SERVICE_PORT}`
+    // Port will be read dynamically when needed
+  }
+
+  get baseUrl(): string {
+    // Read from process.env directly to ensure we get the latest value, especially in tests
+    const port = this._port || Number(process.env.SERVICE_PORT) || env.SERVICE_PORT
+    return `http://localhost:${port}`
   }
 
   async start() {
+    // Read from process.env directly to ensure we get the latest value, especially in tests
+    const port = Number(process.env.SERVICE_PORT) || env.SERVICE_PORT
+    this._port = port
     const server = Bun.serve({
-      port: env.SERVICE_PORT,
+      port,
       fetch: api.app.fetch,
     })
     this.server = server

@@ -1,110 +1,73 @@
-import { db } from "@/database"
-import { $ } from "bun"
-import { sql } from "drizzle-orm"
+import { $ } from "bun";
+import { sql } from "drizzle-orm";
 
 export const servicesUp = async () => {
-  console.log("➖ Starting services...")
-  // In CI: clean environment, just start services normally
-  // Local dev: user controls services manually
-  const result = await $`docker compose up -d`.cwd("./test")
-  // Output docker compose logs
-  if (result.stdout) {
-    console.log(result.stdout.toString())
+  process.stdout.write("➖ Starting services: ");
+  const exitCode = await (await $`docker compose up --wait -d`.cwd("./test").quiet()).exitCode;
+  if (exitCode !== 0) {
+    throw new Error("Failed to start services");
   }
-  if (result.exitCode !== 0) {
-    if (result.stderr) {
-      console.error(result.stderr.toString())
-    }
-    throw new Error("Failed to start services")
-  }
-  
-  // Wait for services to be healthy manually
-  // Key services that must be healthy: postgres, redis, redis-sentinel
-  const requiredServices = ["test-postgres", "test-redis", "test-redis-sentinel"]
-  let retries = 60 // Increased timeout for Sentinel startup
-  while (retries > 0) {
-    const statusResult = await $`docker compose ps --format json`.cwd("./test").quiet()
-    const status = await statusResult.text()
-    const containers = JSON.parse(`[${status.split("\n").filter(Boolean).join(",")}]`)
-    
-    // Check that all containers are running
-    const allRunning = containers.every((c: { State: string }) => c.State === "running")
-    
-    // Check that required services are healthy
-    const requiredHealthy = requiredServices.every((serviceName) => {
-      const container = containers.find((c: { Service: string }) => c.Service === serviceName)
-      if (!container) return false
-      // Must be running and either no healthcheck or healthy
-      return container.State === "running" && (!container.Health || container.Health === "healthy")
-    })
-    
-    if (allRunning && requiredHealthy && containers.length >= requiredServices.length) {
-      console.log("✅")
-      return
-    }
-    await Bun.sleep(1000)
-    retries--
-  }
-  console.log("⚠️  (some services may not be fully ready)")
-}
+  console.log("✅");
+};
 
 export const servicesDown = async () => {
-  console.log("➖ Stopping services...")
-  const result = await $`docker compose down -v --remove-orphans`.cwd("./test")
-  // Output docker compose logs
-  if (result.stdout) {
-    console.log(result.stdout.toString())
+  process.stdout.write("➖ Stopping services: ");
+  const exitCode = await (await $`docker compose down -v --remove-orphans`.cwd("./test").quiet())
+    .exitCode;
+  if (exitCode !== 0) {
+    throw new Error("Failed to stop services");
   }
-  if (result.exitCode !== 0) {
-    if (result.stderr) {
-      console.error(result.stderr.toString())
-    }
-    throw new Error("Failed to stop services")
-  }
-  console.log("✅")
-}
+  console.log("✅");
+};
 
 export const servicesResetAndMigrate = async () => {
-  process.stdout.write("➖ Resetting and migrating services: ")
-  const _start = performance.now()
-  
-  // Wait for PostgreSQL to be ready
-  let retries = 30
+  process.stdout.write("➖ Resetting and migrating services: ");
+  const _start = performance.now();
+
+  // Wait for PostgreSQL to be ready using pg_isready
+  let retries = 30;
   while (retries > 0) {
-    try {
-      await db.execute(sql`SELECT 1`)
-      break
-    } catch (error) {
-      if (retries === 1) throw error
-      await Bun.sleep(500)
-      retries--
+    const pgReadyResult = await $`docker compose exec -T test-postgres pg_isready -U postgres`
+      .cwd("./test")
+      .quiet();
+    if (pgReadyResult.exitCode === 0) {
+      break;
     }
+    if (retries === 1) {
+      throw new Error("PostgreSQL did not become ready in time");
+    }
+    await Bun.sleep(500);
+    retries--;
   }
-  
-  await db.execute(sql`DROP SCHEMA public CASCADE`)
-  await db.execute(sql`CREATE SCHEMA public`)
+
+  // Import database - environment variables should be set by test/setup.ts
+  // node-postgres Pool creates connections lazily, so connection happens on first query
+  const { db } = await import("@/database");
+
+  await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE`);
+  await db.execute(sql`CREATE SCHEMA public`);
   const exitCode = await Bun.spawn(["bun", "--env-file=.env.test", "drizzle-kit", "push"], {
     cwd: "./",
     stdout: "ignore",
     stderr: "inherit",
-  }).exited
+  }).exited;
   if (exitCode !== 0) {
-    throw new Error("Failed to migrate database")
+    throw new Error("Failed to migrate database");
   }
-  console.log("✅")
-}
+  console.log("✅");
+};
 
 // CLI interface for manual service management
 if (import.meta.url === `file://${process.argv[1]}` && Bun.env.NODE_ENV === "test") {
-  console.log("Running services fixture")
+  console.log("Running services fixture");
   switch (process.argv[2]) {
     case "action:up":
-      await servicesUp()
-      await servicesResetAndMigrate()
-      break
+      await servicesUp();
+      await servicesResetAndMigrate();
+      break;
     case "action:down":
-      await servicesDown()
-      break
+      await servicesDown();
+      break;
   }
-  process.exit(0)
+  process.exit(0);
 }
