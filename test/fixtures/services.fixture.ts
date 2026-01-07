@@ -6,9 +6,11 @@ export const servicesUp = async () => {
   console.log("➖ Starting services...")
   // Print connection strings for debugging
   const pgConn = process.env.POSTGRES_CONNECTION_STRING || 'not set'
-  // Show full connection string (first 70 chars) to see actual format
-  const pgPreview = pgConn.length > 70 ? `${pgConn.substring(0, 70)}...` : pgConn
-  console.log(`📋 PostgreSQL (raw, length ${pgConn.length}): ${pgPreview}`)
+  // Log the actual connection string characters (first 70) to see what we're getting
+  console.log(`📋 PostgreSQL (raw, length ${pgConn.length}): ${pgConn.substring(0, 70)}${pgConn.length > 70 ? '...' : ''}`)
+  // Also log character codes to debug any hidden characters
+  const firstChars = pgConn.substring(0, 20).split('').map(c => `${c.charCodeAt(0)}(${c})`).join(' ')
+  console.log(`📋 PostgreSQL (first 20 chars as codes): ${firstChars}`)
   try {
     const pgUrl = new URL(pgConn)
     console.log(`📋 PostgreSQL (parsed): ${pgUrl.protocol}//${pgUrl.username}:****@${pgUrl.hostname}:${pgUrl.port}${pgUrl.pathname}`)
