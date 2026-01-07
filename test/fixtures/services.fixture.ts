@@ -13,7 +13,8 @@ export const servicesUp = async () => {
   console.log(`📋 PostgreSQL (first 20 chars as codes): ${firstChars}`)
   try {
     const pgUrl = new URL(pgConn)
-    console.log(`📋 PostgreSQL (parsed): ${pgUrl.protocol}//${pgUrl.username}:****@${pgUrl.hostname}:${pgUrl.port}${pgUrl.pathname}`)
+    console.log(`📋 PostgreSQL (parsed components): protocol="${pgUrl.protocol}", username="${pgUrl.username}", hostname="${pgUrl.hostname}", port="${pgUrl.port}", pathname="${pgUrl.pathname}"`)
+    console.log(`📋 PostgreSQL (formatted): ${pgUrl.protocol}//${pgUrl.username || '(no user)'}:****@${pgUrl.hostname}:${pgUrl.port}${pgUrl.pathname}`)
   } catch (e) {
     console.log(`📋 PostgreSQL (parse failed): ${pgConn}`)
     console.log(`📋 Parse error: ${e}`)
