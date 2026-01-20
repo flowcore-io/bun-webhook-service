@@ -64,13 +64,25 @@ async function verifyNatsConnection(): Promise<boolean> {
 }
 
 // Verify PostgreSQL connection
+// Note: This uses the db instance which is created at module load time
+// If PostgreSQL wasn't ready when the module loaded, the connection might be closed
+// We retry here to give PostgreSQL time to be ready
 async function verifyPostgresConnection(): Promise<boolean> {
-  try {
-    await db.execute(sql`SELECT 1`)
-    return true
-  } catch {
-    return false
+  // Retry a few times since the connection might be closed initially
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await db.execute(sql`SELECT 1`)
+      return true
+    } catch (error) {
+      if (attempt === 4) {
+        // Last attempt failed
+        return false
+      }
+      // Wait a bit before retrying
+      await Bun.sleep(500)
+    }
   }
+  return false
 }
 
 export const servicesUp = async () => {
@@ -93,6 +105,9 @@ export const servicesUp = async () => {
     // If ps command fails, services aren't running, continue with startup
   }
   
+  // Start services in detached mode
+  // We don't use --wait because NATS healthcheck can be unreliable
+  // Instead, we manually verify service connections below
   const result = await $`docker compose up -d`.cwd("./test")
   // Output docker compose logs
   if (result.stdout) {
@@ -147,6 +162,10 @@ export const servicesUp = async () => {
           postgresReady = await verifyPostgresConnection()
         }
         if (redisReady && natsReady && postgresReady) {
+          // Wait a bit longer to ensure connections are fully established
+          // This is especially important for PostgreSQL which may be marked healthy
+          // but not yet ready to accept connections
+          await Bun.sleep(2000)
           console.log("✅")
           return
         }
@@ -154,6 +173,8 @@ export const servicesUp = async () => {
       }
       
       if (redisReady && natsReady && postgresReady) {
+        // Wait a bit longer to ensure connections are fully established
+        await Bun.sleep(2000)
         console.log("✅")
         return
       }
@@ -197,6 +218,16 @@ export const servicesResetAndMigrate = async () => {
   // Wait for PostgreSQL to be ready with retry and connection verification
   // Increase retries and wait time for CI environments where services might take longer
   const isCI = process.env.CI === "true"
+  
+  // Add initial delay to allow PostgreSQL to fully initialize after being marked healthy
+  // Even with --wait flag, PostgreSQL might need a moment to accept connections
+  // This is especially important in CI where services might take longer
+  if (isCI) {
+    await Bun.sleep(2000) // Wait 2 seconds in CI after healthcheck passes
+  } else {
+    await Bun.sleep(500) // Wait 0.5 seconds locally
+  }
+  
   let retries = isCI ? 60 : 30 // More retries in CI
   let lastError: Error | null = null
   while (retries > 0) {
