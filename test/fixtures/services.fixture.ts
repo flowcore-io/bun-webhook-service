@@ -77,6 +77,22 @@ export const servicesUp = async () => {
   console.log("➖ Starting services...")
   // In CI: clean environment, just start services normally
   // Local dev: user controls services manually
+  // Check if services are already running to avoid duplicate starts
+  try {
+    const psResult = await $`docker compose ps --format json`.cwd("./test").quiet()
+    const psText = await psResult.text()
+    if (psText) {
+      const containers = JSON.parse(`[${psText.split("\n").filter(Boolean).join(",")}]`)
+      const runningContainers = containers.filter((c: { State: string }) => c.State === "running")
+      if (runningContainers.length > 0) {
+        console.log("   Services already running, skipping start")
+        return
+      }
+    }
+  } catch {
+    // If ps command fails, services aren't running, continue with startup
+  }
+  
   const result = await $`docker compose up -d`.cwd("./test")
   // Output docker compose logs
   if (result.stdout) {
@@ -179,7 +195,9 @@ export const servicesResetAndMigrate = async () => {
   const _start = performance.now()
   
   // Wait for PostgreSQL to be ready with retry and connection verification
-  let retries = 30
+  // Increase retries and wait time for CI environments where services might take longer
+  const isCI = process.env.CI === "true"
+  let retries = isCI ? 60 : 30 // More retries in CI
   let lastError: Error | null = null
   while (retries > 0) {
     try {
@@ -205,8 +223,8 @@ export const servicesResetAndMigrate = async () => {
         console.error("\n❌ PostgreSQL connection failed after retries:", lastError.message)
         throw lastError
       }
-      // Wait before retrying
-      await Bun.sleep(500)
+      // Wait before retrying - longer wait in CI
+      await Bun.sleep(isCI ? 1000 : 500)
       retries--
     }
   }
