@@ -42,4 +42,4 @@ jobs:
         run: bun run test
 
       - name: Stop Services
-        run: bun run services:down
+        run: bun run test:services:down
