@@ -5,9 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "bun run --watch src/index.ts",
-    "test": "bun --env-file=.env.test test",
-    "test:watch": "bun --env-file=.env.test test --watch",
-    "test:coverage": "bun --env-file=.env.test test --coverage",
+    "test": "bun --env-file=.env.test test --timeout 120000",
+    "test:watch": "bun --env-file=.env.test test --watch --timeout 120000",
+    "test:coverage": "bun --env-file=.env.test test --coverage --timeout 120000",
     "test:services:up": "bun run --env-file=.env.test test/fixtures/services.fixture.ts action:up",
     "test:services:down": "bun run --env-file=.env.test test/fixtures/services.fixture.ts action:down",
     "lint": "biome lint",

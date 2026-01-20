@@ -7,19 +7,35 @@ import { pathways } from "@/pathways"
 import { redisService } from "@/services/redis.service"
 import { natsService } from "@/services/nats.service"
 
-// Initialize services
+// Initialize services with retry logic (fixed delay, no exponential backoff)
 async function initializeServices() {
-	try {
-		await redisService.connect()
-		await natsService.connect()
-	} catch (error) {
-		console.error("Failed to initialize services:", error)
-		// Don't throw - allow app to start even if services fail
+	const maxRetries = 10
+	const delay = 500 // Fixed 500ms delay between retries
+	
+	for (let attempt = 0; attempt < maxRetries; attempt++) {
+		try {
+			await redisService.connect()
+			await natsService.connect()
+			console.log("✅ Services initialized successfully")
+			return // Success
+		} catch (error) {
+			if (attempt === maxRetries - 1) {
+				console.error("Failed to initialize services after", maxRetries, "retries:", error)
+				// Don't throw - allow app to start even if services fail
+				// Services will retry on first use via ensureConnected()
+				return
+			}
+			console.warn(`Service initialization attempt ${attempt + 1}/${maxRetries} failed, retrying in ${delay}ms...`)
+			await new Promise((resolve) => setTimeout(resolve, delay))
+		}
 	}
 }
 
-// Initialize services on module load
-initializeServices().catch(console.error)
+// Initialize services on module load (non-blocking)
+initializeServices().catch((error) => {
+	console.error("Service initialization error:", error)
+	// Don't crash the app - services will retry on first use
+})
 
 export const api = new HonoApi({
   openapi: {

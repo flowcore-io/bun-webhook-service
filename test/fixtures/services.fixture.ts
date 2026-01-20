@@ -2,6 +2,77 @@ import { db } from "@/database"
 import { $ } from "bun"
 import { sql } from "drizzle-orm"
 
+// Verify Redis Sentinel connection
+async function verifyRedisConnection(): Promise<boolean> {
+  try {
+    const Redis = (await import("ioredis")).default
+    const sentinelHosts = process.env.REDIS_SENTINEL_HOSTS || "localhost:26380"
+    const masterName = process.env.REDIS_SENTINEL_MASTER_NAME || "mymaster"
+    
+    const sentinels = sentinelHosts.split(",").map((host) => {
+      const [hostname, port] = host.trim().split(":")
+      return {
+        host: hostname || "localhost",
+        port: Number(port) || 26379,
+      }
+    })
+    
+    const client = new Redis({
+      sentinels,
+      name: masterName,
+      maxRetriesPerRequest: 1,
+      enableReadyCheck: true,
+      lazyConnect: true,
+      connectTimeout: 5000, // 5 second timeout
+      retryStrategy: () => null, // Don't retry on failure
+    })
+    
+    try {
+      await client.connect()
+      await client.ping()
+      await client.quit()
+      return true
+    } catch (error) {
+      // Clean up on error
+      try {
+        await client.quit()
+      } catch {
+        // Ignore cleanup errors
+      }
+      return false
+    }
+  } catch (error) {
+    // Log error for debugging
+    if (error instanceof Error) {
+      console.warn(`Redis verification failed: ${error.message}`)
+    }
+    return false
+  }
+}
+
+// Verify NATS connection
+async function verifyNatsConnection(): Promise<boolean> {
+  try {
+    const { connect } = await import("nats")
+    const url = process.env.NATS_URL || "nats://localhost:14222"
+    const connection = await connect({ servers: url })
+    await connection.close()
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Verify PostgreSQL connection
+async function verifyPostgresConnection(): Promise<boolean> {
+  try {
+    await db.execute(sql`SELECT 1`)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const servicesUp = async () => {
   console.log("➖ Starting services...")
   // In CI: clean environment, just start services normally
@@ -19,8 +90,8 @@ export const servicesUp = async () => {
   }
   
   // Wait for services to be healthy manually
-  // Key services that must be healthy: postgres, redis, redis-sentinel
-  const requiredServices = ["test-postgres", "test-redis", "test-redis-sentinel"]
+  // Key services that must be healthy: postgres, redis, redis-sentinel, nats
+  const requiredServices = ["test-postgres", "test-redis", "test-redis-sentinel", "test-nats"]
   let retries = 60 // Increased timeout for Sentinel startup
   while (retries > 0) {
     const statusResult = await $`docker compose ps --format json`.cwd("./test").quiet()
@@ -39,8 +110,47 @@ export const servicesUp = async () => {
     })
     
     if (allRunning && requiredHealthy && containers.length >= requiredServices.length) {
-      console.log("✅")
-      return
+      // Verify services are actually connectable
+      console.log("➖ Verifying service connections...")
+      let redisReady = false
+      let natsReady = false
+      
+      // Try to connect to services (with retries)
+      let postgresReady = false
+      for (let i = 0; i < 20; i++) { // Increased retries for Redis Sentinel
+        if (!redisReady) {
+          redisReady = await verifyRedisConnection()
+          if (!redisReady && i > 0 && i % 5 === 0) {
+            console.log(`   Redis connection attempt ${i + 1}/20...`)
+          }
+        }
+        if (!natsReady) {
+          natsReady = await verifyNatsConnection()
+        }
+        if (!postgresReady) {
+          postgresReady = await verifyPostgresConnection()
+        }
+        if (redisReady && natsReady && postgresReady) {
+          console.log("✅")
+          return
+        }
+        await Bun.sleep(1000)
+      }
+      
+      if (redisReady && natsReady && postgresReady) {
+        console.log("✅")
+        return
+      }
+      
+      // Log which services failed
+      const failedServices = []
+      if (!redisReady) failedServices.push("Redis")
+      if (!natsReady) failedServices.push("NATS")
+      if (!postgresReady) failedServices.push("PostgreSQL")
+      
+      console.log(`⚠️  Services not fully connectable: ${failedServices.join(", ")}`)
+      console.log("   They may still work - services will retry on first use")
+      return // Continue anyway - services will retry on first use
     }
     await Bun.sleep(1000)
     retries--
@@ -68,21 +178,49 @@ export const servicesResetAndMigrate = async () => {
   process.stdout.write("➖ Resetting and migrating services: ")
   const _start = performance.now()
   
-  // Wait for PostgreSQL to be ready
+  // Wait for PostgreSQL to be ready with retry and connection verification
   let retries = 30
+  let lastError: Error | null = null
   while (retries > 0) {
     try {
+      // Try to execute a simple query to verify connection
       await db.execute(sql`SELECT 1`)
+      // Connection is good, break out of retry loop
       break
     } catch (error) {
-      if (retries === 1) throw error
+      lastError = error instanceof Error ? error : new Error(String(error))
+      const errorMessage = lastError.message.toLowerCase()
+      
+      // Check for common connection issues
+      if (errorMessage.includes("connection closed") || errorMessage.includes("econnrefused")) {
+        if (retries === 1) {
+          console.error("\n❌ PostgreSQL connection failed.")
+          console.error("   Make sure you're using the correct services:")
+          console.error("   - For tests: use 'bun test:services:up' (uses test/docker-compose.yml)")
+          console.error("   - For dev: use 'bun services:up' (uses docker-compose.dev.yml)")
+          console.error(`   Error: ${lastError.message}`)
+          throw lastError
+        }
+      } else if (retries === 1) {
+        console.error("\n❌ PostgreSQL connection failed after retries:", lastError.message)
+        throw lastError
+      }
+      // Wait before retrying
       await Bun.sleep(500)
       retries--
     }
   }
   
-  await db.execute(sql`DROP SCHEMA public CASCADE`)
-  await db.execute(sql`CREATE SCHEMA public`)
+  // Now perform the schema operations with error handling
+  try {
+    await db.execute(sql`DROP SCHEMA IF EXISTS public CASCADE`)
+    await db.execute(sql`CREATE SCHEMA public`)
+  } catch (error) {
+    console.error("\n❌ Failed to reset database schema:", error instanceof Error ? error.message : String(error))
+    throw error
+  }
+  
+  // Run migrations
   const exitCode = await Bun.spawn(["bun", "--env-file=.env.test", "drizzle-kit", "push"], {
     cwd: "./",
     stdout: "ignore",

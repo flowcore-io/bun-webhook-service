@@ -13,6 +13,10 @@ if (!process.env.POSTGRES_CONNECTION_STRING) {
 		"postgresql://postgres:test@localhost:54321/bun_webhook_service_test"
 }
 if (!process.env.SERVICE_PORT) process.env.SERVICE_PORT = "3000"
-if (!process.env.REDIS_SENTINEL_HOSTS) process.env.REDIS_SENTINEL_HOSTS = "localhost:26380"
-if (!process.env.REDIS_SENTINEL_MASTER_NAME) process.env.REDIS_SENTINEL_MASTER_NAME = "mymaster"
+// For tests, use direct Redis connection instead of Sentinel to avoid Docker networking issues
+// Tests don't need high availability features, so direct connection is simpler and more reliable
+if (!process.env.REDIS_SENTINEL_HOSTS) {
+	// Don't set REDIS_SENTINEL_HOSTS - this will make the service use direct connection
+	// Redis is available on localhost:16379 for tests
+}
 if (!process.env.NATS_URL) process.env.NATS_URL = "nats://localhost:14222"
