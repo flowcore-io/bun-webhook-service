@@ -1,6 +1,7 @@
 import { db } from "@/database"
 import { $ } from "bun"
 import { sql } from "drizzle-orm"
+import { drizzle } from "drizzle-orm/bun-sql"
 
 // Verify Redis Sentinel connection
 async function verifyRedisConnection(): Promise<boolean> {
@@ -64,22 +65,33 @@ async function verifyNatsConnection(): Promise<boolean> {
 }
 
 // Verify PostgreSQL connection
-// Note: This uses the db instance which is created at module load time
-// If PostgreSQL wasn't ready when the module loaded, the connection might be closed
-// We retry here to give PostgreSQL time to be ready
+// Create a fresh connection for verification instead of using the module-level db
+// This avoids issues where the module-level connection was created before PostgreSQL was ready
 async function verifyPostgresConnection(): Promise<boolean> {
-  // Retry a few times since the connection might be closed initially
-  for (let attempt = 0; attempt < 5; attempt++) {
+  const connectionString = process.env.POSTGRES_CONNECTION_STRING || "postgresql://postgres:test@localhost:54321/bun_webhook_service_test"
+  const isCI = process.env.CI === "true"
+  
+  // In CI, PostgreSQL might need more time to be fully ready after healthcheck passes
+  // Use more retries and longer waits in CI
+  const maxAttempts = isCI ? 30 : 5
+  const waitTime = isCI ? 1000 : 500
+  
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      await db.execute(sql`SELECT 1`)
+      // Create a fresh connection for verification
+      const testClient = new Bun.SQL(connectionString)
+      const testDb = drizzle({ client: testClient, schema: {} })
+      await testDb.execute(sql`SELECT 1`)
+      // Clean up the test connection
+      await testClient.close()
       return true
     } catch (error) {
-      if (attempt === 4) {
+      if (attempt === maxAttempts - 1) {
         // Last attempt failed
         return false
       }
-      // Wait a bit before retrying
-      await Bun.sleep(500)
+      // Wait before retrying - longer in CI
+      await Bun.sleep(waitTime)
     }
   }
   return false
@@ -141,18 +153,29 @@ export const servicesUp = async () => {
     })
     
     if (allRunning && requiredHealthy && containers.length >= requiredServices.length) {
+      // Add extra wait time after healthcheck passes, especially in CI
+      // PostgreSQL may be marked healthy but not yet ready to accept connections
+      const isCI = process.env.CI === "true"
+      if (isCI) {
+        await Bun.sleep(3000) // Wait 3 seconds in CI after healthcheck passes
+      } else {
+        await Bun.sleep(1000) // Wait 1 second locally
+      }
+      
       // Verify services are actually connectable
       console.log("➖ Verifying service connections...")
       let redisReady = false
       let natsReady = false
       
       // Try to connect to services (with retries)
+      // Use more retries in CI where services might take longer
+      const maxRetries = isCI ? 40 : 20
       let postgresReady = false
-      for (let i = 0; i < 20; i++) { // Increased retries for Redis Sentinel
+      for (let i = 0; i < maxRetries; i++) {
         if (!redisReady) {
           redisReady = await verifyRedisConnection()
           if (!redisReady && i > 0 && i % 5 === 0) {
-            console.log(`   Redis connection attempt ${i + 1}/20...`)
+            console.log(`   Redis connection attempt ${i + 1}/${maxRetries}...`)
           }
         }
         if (!natsReady) {
@@ -160,21 +183,24 @@ export const servicesUp = async () => {
         }
         if (!postgresReady) {
           postgresReady = await verifyPostgresConnection()
+          if (!postgresReady && i > 0 && i % 5 === 0) {
+            console.log(`   PostgreSQL connection attempt ${i + 1}/${maxRetries}...`)
+          }
         }
         if (redisReady && natsReady && postgresReady) {
           // Wait a bit longer to ensure connections are fully established
           // This is especially important for PostgreSQL which may be marked healthy
           // but not yet ready to accept connections
-          await Bun.sleep(2000)
+          await Bun.sleep(isCI ? 3000 : 2000)
           console.log("✅")
           return
         }
-        await Bun.sleep(1000)
+        await Bun.sleep(isCI ? 1500 : 1000)
       }
       
       if (redisReady && natsReady && postgresReady) {
         // Wait a bit longer to ensure connections are fully established
-        await Bun.sleep(2000)
+        await Bun.sleep(isCI ? 3000 : 2000)
         console.log("✅")
         return
       }
@@ -184,6 +210,13 @@ export const servicesUp = async () => {
       if (!redisReady) failedServices.push("Redis")
       if (!natsReady) failedServices.push("NATS")
       if (!postgresReady) failedServices.push("PostgreSQL")
+      
+      // In CI, fail hard if PostgreSQL isn't ready since it's required for tests
+      if (isCI && !postgresReady) {
+        console.error(`❌ PostgreSQL connection failed in CI after ${maxRetries} attempts`)
+        console.error("   This is required for tests to run")
+        throw new Error("PostgreSQL connection failed in CI")
+      }
       
       console.log(`⚠️  Services not fully connectable: ${failedServices.join(", ")}`)
       console.log("   They may still work - services will retry on first use")
@@ -218,23 +251,30 @@ export const servicesResetAndMigrate = async () => {
   // Wait for PostgreSQL to be ready with retry and connection verification
   // Increase retries and wait time for CI environments where services might take longer
   const isCI = process.env.CI === "true"
+  const connectionString = process.env.POSTGRES_CONNECTION_STRING || "postgresql://postgres:test@localhost:54321/bun_webhook_service_test"
   
   // Add initial delay to allow PostgreSQL to fully initialize after being marked healthy
-  // Even with --wait flag, PostgreSQL might need a moment to accept connections
   // This is especially important in CI where services might take longer
   if (isCI) {
-    await Bun.sleep(2000) // Wait 2 seconds in CI after healthcheck passes
+    await Bun.sleep(3000) // Wait 3 seconds in CI after healthcheck passes
   } else {
-    await Bun.sleep(500) // Wait 0.5 seconds locally
+    await Bun.sleep(1000) // Wait 1 second locally
   }
   
+  // First, verify PostgreSQL is ready using a fresh connection
+  // The module-level db connection might be closed if it was created before PostgreSQL was ready
   let retries = isCI ? 60 : 30 // More retries in CI
   let lastError: Error | null = null
-  while (retries > 0) {
+  let connectionVerified = false
+  
+  while (retries > 0 && !connectionVerified) {
     try {
-      // Try to execute a simple query to verify connection
-      await db.execute(sql`SELECT 1`)
-      // Connection is good, break out of retry loop
+      // Create a fresh connection for verification
+      const testClient = new Bun.SQL(connectionString)
+      const testDb = drizzle({ client: testClient, schema: {} })
+      await testDb.execute(sql`SELECT 1`)
+      await testClient.close()
+      connectionVerified = true
       break
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error))
@@ -256,6 +296,36 @@ export const servicesResetAndMigrate = async () => {
       }
       // Wait before retrying - longer wait in CI
       await Bun.sleep(isCI ? 1000 : 500)
+      retries--
+    }
+  }
+  
+  if (!connectionVerified) {
+    throw new Error("PostgreSQL connection verification failed")
+  }
+  
+  // Now try to use the module-level db connection
+  // If it's still closed, we'll need to recreate it or wait a bit more
+  retries = 10
+  while (retries > 0) {
+    try {
+      await db.execute(sql`SELECT 1`)
+      break
+    } catch (error) {
+      if (retries === 1) {
+        // If the module-level connection is still closed, recreate it
+        // We can't directly recreate it, but we can wait a bit more
+        // The connection should eventually work since we verified PostgreSQL is ready
+        console.warn("   Module-level db connection still closed, waiting...")
+        await Bun.sleep(2000)
+        try {
+          await db.execute(sql`SELECT 1`)
+        } catch (finalError) {
+          console.error("\n❌ PostgreSQL connection failed after verification:", finalError instanceof Error ? finalError.message : String(finalError))
+          throw finalError
+        }
+      }
+      await Bun.sleep(500)
       retries--
     }
   }
